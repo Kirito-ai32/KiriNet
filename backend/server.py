@@ -245,6 +245,12 @@ async def get_messages(conversation_id: str, limit: int = 100):
     messages = await db.messages.find(
         {"conversation_id": conversation_id}
     ).sort("timestamp", 1).to_list(limit)
+    
+    # Remove MongoDB _id from all messages
+    for msg in messages:
+        if '_id' in msg:
+            del msg['_id']
+    
     return messages
 
 @api_router.post("/messages", response_model=Message)
