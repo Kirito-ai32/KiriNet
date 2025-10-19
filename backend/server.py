@@ -193,6 +193,10 @@ async def get_conversations(user_id: str):
     
     result = []
     for conv in conversations:
+        # Remove MongoDB _id
+        if '_id' in conv:
+            del conv['_id']
+            
         # Get last message
         last_msg = None
         if conv.get('last_message'):
@@ -200,6 +204,8 @@ async def get_conversations(user_id: str):
                 {"conversation_id": conv['id']},
                 sort=[("timestamp", -1)]
             )
+            if last_msg and '_id' in last_msg:
+                del last_msg['_id']
         
         # Get other participant info for direct conversations
         other_user = None
@@ -207,6 +213,8 @@ async def get_conversations(user_id: str):
             other_participant_id = [p for p in conv['participants'] if p != user_id][0]
             other_user_data = await db.users.find_one({"id": other_participant_id})
             if other_user_data:
+                if '_id' in other_user_data:
+                    del other_user_data['_id']
                 other_user = User(**other_user_data)
         
         result.append({
