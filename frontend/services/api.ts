@@ -1,7 +1,10 @@
 import Constants from 'expo-constants';
 
-const BACKEND_URL = Constants.expoConfig?.extra?.EXPO_PUBLIC_BACKEND_URL || 'http://localhost:8001';
+// @ts-ignore
+const BACKEND_URL = process.env.EXPO_PUBLIC_BACKEND_URL || Constants.expoConfig?.extra?.EXPO_PUBLIC_BACKEND_URL || 'http://localhost:8001';
 const API_URL = `${BACKEND_URL}/api`;
+
+console.log('API Service initialized with URL:', API_URL);
 
 export const api = {
   async createUser(nickname: string) {
