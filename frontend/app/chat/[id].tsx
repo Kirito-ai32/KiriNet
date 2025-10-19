@@ -94,7 +94,10 @@ export default function ChatScreen() {
   };
 
   const handleSendMessage = async () => {
-    if (!inputText.trim() || !user) return;
+    if (!inputText.trim() || !user) {
+      console.log('Cannot send: empty message or no user');
+      return;
+    }
 
     const messageData = {
       conversation_id: conversationId,
@@ -103,9 +106,17 @@ export default function ChatScreen() {
       content: inputText.trim(),
     };
 
+    console.log('Sending message:', messageData);
+    
+    // Очищаем поле ввода сразу для лучшего UX
+    const messageCopy = inputText.trim();
+    setInputText('');
+    Keyboard.dismiss();
+
     try {
       // Отправляем через REST API (надежнее чем WebSocket в данной среде)
       const newMessage = await api.createMessage(messageData);
+      console.log('Message sent successfully:', newMessage);
       
       // Добавляем сообщение в список локально
       setMessages((prev) => [...prev, newMessage]);
@@ -115,15 +126,14 @@ export default function ChatScreen() {
         socketService.sendMessage(messageData);
       }
       
-      setInputText('');
-      Keyboard.dismiss();
-      
       // Прокручиваем вниз
       setTimeout(() => {
         flatListRef.current?.scrollToEnd({ animated: true });
       }, 100);
     } catch (error) {
       console.error('Error sending message:', error);
+      // Восстанавливаем текст при ошибке
+      setInputText(messageCopy);
       alert('Ошибка отправки сообщения. Попробуйте снова.');
     }
   };
