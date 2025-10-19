@@ -234,6 +234,9 @@ async def create_conversation(conversation_data: dict):
             "participants": {"$all": conversation_data['participants']}
         })
         if existing:
+            # Remove MongoDB _id before returning
+            if '_id' in existing:
+                del existing['_id']
             return existing
     
     conversation = Conversation(**conversation_data)
