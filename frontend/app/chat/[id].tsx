@@ -93,7 +93,7 @@ export default function ChatScreen() {
     }
   };
 
-  const handleSendMessage = () => {
+  const handleSendMessage = async () => {
     if (!inputText.trim() || !user) return;
 
     const messageData = {
@@ -103,9 +103,29 @@ export default function ChatScreen() {
       content: inputText.trim(),
     };
 
-    socketService.sendMessage(messageData);
-    setInputText('');
-    Keyboard.dismiss();
+    try {
+      // Отправляем через REST API (надежнее чем WebSocket в данной среде)
+      const newMessage = await api.createMessage(messageData);
+      
+      // Добавляем сообщение в список локально
+      setMessages((prev) => [...prev, newMessage]);
+      
+      // Также пытаемся отправить через WebSocket для real-time если подключен
+      if (socketService.isConnected()) {
+        socketService.sendMessage(messageData);
+      }
+      
+      setInputText('');
+      Keyboard.dismiss();
+      
+      // Прокручиваем вниз
+      setTimeout(() => {
+        flatListRef.current?.scrollToEnd({ animated: true });
+      }, 100);
+    } catch (error) {
+      console.error('Error sending message:', error);
+      alert('Ошибка отправки сообщения. Попробуйте снова.');
+    }
   };
 
   const handleTyping = (text: string) => {
