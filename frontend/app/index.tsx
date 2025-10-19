@@ -49,11 +49,15 @@ export default function NicknameScreen() {
 
     setLoading(true);
     try {
+      console.log('Creating user with nickname:', nickname.trim());
       const userData = await api.createUser(nickname.trim());
+      console.log('User created successfully:', userData);
       await setUser(userData);
+      console.log('User saved to store, navigating to chats...');
       router.replace('/chats');
     } catch (error) {
       console.error('Error creating user:', error);
+      alert('Ошибка подключения. Попробуйте еще раз.');
       setLoading(false);
     }
   };
