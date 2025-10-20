@@ -74,9 +74,9 @@ def verify_token(token: str, token_type: str = "access") -> Optional[str]:
             return None
             
         return user_id
-    except jwt.ExpiredSignatureError:
+    except ExpiredSignatureError:
         return None
-    except jwt.JWTError:
+    except InvalidTokenError:
         return None
 
 
