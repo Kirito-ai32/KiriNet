@@ -1,19 +1,18 @@
 #!/usr/bin/env python3
 """
-KiriNet Messenger Backend API Test Suite
-Tests all REST API endpoints for the KiriNet messaging application
+Comprehensive testing for KiriNet Authorization System
+Tests all authentication methods: phone (SMS), email, and nickname
 """
 
 import requests
 import json
-import uuid
+import time
 from datetime import datetime
-import sys
 
 # Backend URL from environment
 BACKEND_URL = "https://kiri-chat.preview.emergentagent.com/api"
 
-class KiriNetAPITester:
+class KiriNetAuthTester:
     def __init__(self):
         self.base_url = BACKEND_URL
         self.test_users = []
