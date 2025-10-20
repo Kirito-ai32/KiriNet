@@ -25,12 +25,16 @@ export default function NicknameScreen() {
   const [scaleAnim] = useState(new Animated.Value(0.8));
 
   useEffect(() => {
-    if (user) {
-      router.replace('/(tabs)/chats');
-    } else {
-      // Перенаправляем на выбор языка
-      router.replace('/auth/language');
-    }
+    // Небольшая задержка чтобы Root Layout успел смонтироваться
+    const timer = setTimeout(() => {
+      if (user) {
+        router.replace('/(tabs)/chats');
+      } else {
+        router.replace('/auth/language');
+      }
+    }, 100);
+
+    return () => clearTimeout(timer);
   }, [user]);
 
   const handleContinue = async () => {
