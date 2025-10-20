@@ -4,6 +4,7 @@
 import os
 import bcrypt
 import jwt
+from jwt.exceptions import ExpiredSignatureError, InvalidTokenError
 from datetime import datetime, timedelta
 from typing import Optional
 from fastapi import HTTPException, Depends
