@@ -9,7 +9,16 @@ from typing import List, Optional
 from datetime import datetime
 import socketio
 
-from models import User, UserCreate, Message, MessageCreate, Conversation
+from models import (
+    User, UserRegister, UserLogin, UserUpdate, 
+    Message, MessageCreate, Conversation,
+    Token, SMSVerification
+)
+from auth import (
+    hash_password, verify_password, 
+    create_access_token, create_refresh_token,
+    verify_token, get_current_user, generate_sms_code
+)
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
