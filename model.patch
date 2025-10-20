@@ -1,129 +1,340 @@
+diff --git a/backend/auth.py b/backend/auth.py
+index 07eab27..fc0d29a 100644
+--- a/backend/auth.py
++++ b/backend/auth.py
+@@ -4,6 +4,7 @@
+ import os
+ import bcrypt
+ import jwt
++from jwt.exceptions import ExpiredSignatureError, InvalidTokenError
+ from datetime import datetime, timedelta
+ from typing import Optional
+ from fastapi import HTTPException, Depends
+@@ -73,9 +74,9 @@ def verify_token(token: str, token_type: str = "access") -> Optional[str]:
+             return None
+             
+         return user_id
+-    except jwt.ExpiredSignatureError:
++    except ExpiredSignatureError:
+         return None
+-    except jwt.JWTError:
++    except InvalidTokenError:
+         return None
+ 
+ 
+diff --git a/model.patch b/model.patch
+index 0411bb7..e69de29 100644
+--- a/model.patch
++++ b/model.patch
+@@ -1,129 +0,0 @@
+-diff --git a/test_result.md b/test_result.md
+-index 187cba4..3290292 100644
+---- a/test_result.md
+-+++ b/test_result.md
+-@@ -100,4 +100,121 @@
+- 
+- #====================================================================================================
+- # Testing Data - Main Agent and testing sub agent both should log testing data below this section
+--#====================================================================================================
+-\ No newline at end of file
+-+#====================================================================================================
+-+
+-+user_problem_statement: "Test the KiriNet Messenger backend API endpoints for REST API functionality"
+-+
+-+backend:
+-+  - task: "Root API Endpoint"
+-+    implemented: true
+-+    working: true
+-+    file: "backend/server.py"
+-+    stuck_count: 0
+-+    priority: "high"
+-+    needs_retesting: false
+-+    status_history:
+-+      - working: true
+-+        agent: "testing"
+-+        comment: "✅ GET /api/ endpoint working correctly - returns KiriNet API message as expected"
+-+
+-+  - task: "User Creation API"
+-+    implemented: true
+-+    working: true
+-+    file: "backend/server.py"
+-+    stuck_count: 0
+-+    priority: "high"
+-+    needs_retesting: false
+-+    status_history:
+-+      - working: true
+-+        agent: "testing"
+-+        comment: "✅ POST /api/users working correctly - creates users with valid UUIDs, proper data structure, and handles duplicate nicknames"
+-+
+-+  - task: "Get Users API"
+-+    implemented: true
+-+    working: true
+-+    file: "backend/server.py"
+-+    stuck_count: 0
+-+    priority: "high"
+-+    needs_retesting: false
+-+    status_history:
+-+      - working: true
+-+        agent: "testing"
+-+        comment: "✅ GET /api/users working correctly - returns list of users with proper UUID format and required fields"
+-+
+-+  - task: "Get Conversations API"
+-+    implemented: true
+-+    working: true
+-+    file: "backend/server.py"
+-+    stuck_count: 0
+-+    priority: "high"
+-+    needs_retesting: false
+-+    status_history:
+-+      - working: true
+-+        agent: "testing"
+-+        comment: "✅ GET /api/conversations working correctly - automatically creates global conversation for new users, proper UUID format, users added to participants"
+-+
+-+  - task: "Get Messages API"
+-+    implemented: true
+-+    working: true
+-+    file: "backend/server.py"
+-+    stuck_count: 0
+-+    priority: "high"
+-+    needs_retesting: false
+-+    status_history:
+-+      - working: true
+-+        agent: "testing"
+-+        comment: "✅ GET /api/messages/{conversationId} working correctly - returns messages list, handles empty conversations properly"
+-+
+-+  - task: "Create Message API"
+-+    implemented: true
+-+    working: true
+-+    file: "backend/server.py"
+-+    stuck_count: 0
+-+    priority: "high"
+-+    needs_retesting: false
+-+    status_history:
+-+      - working: true
+-+        agent: "testing"
+-+        comment: "✅ POST /api/messages working correctly - creates messages with valid UUIDs, proper data structure, message persisted successfully"
+-+
+-+  - task: "MongoDB Integration"
+-+    implemented: true
+-+    working: true
+-+    file: "backend/server.py"
+-+    stuck_count: 0
+-+    priority: "high"
+-+    needs_retesting: false
+-+    status_history:
+-+      - working: true
+-+        agent: "testing"
+-+        comment: "✅ MongoDB integration working correctly - data persistence verified, no ObjectId serialization errors, proper UUID usage throughout"
+-+
+-+frontend:
+-+  - task: "Frontend Testing"
+-+    implemented: false
+-+    working: "NA"
+-+    file: "frontend/app"
+-+    stuck_count: 0
+-+    priority: "low"
+-+    needs_retesting: false
+-+    status_history:
+-+      - working: "NA"
+-+        agent: "testing"
+-+        comment: "Frontend testing not performed as per testing agent limitations - only backend REST API testing completed"
+-+
+-+metadata:
+-+  created_by: "testing_agent"
+-+  version: "1.0"
+-+  test_sequence: 1
+-+  run_ui: false
+-+
+-+test_plan:
+-+  current_focus:
+-+    - "All backend REST API endpoints tested and verified"
+-+  stuck_tasks: []
+-+  test_all: false
+-+  test_priority: "high_first"
+-+
+-+agent_communication:
+-+  - agent: "testing"
+-+    message: "Completed comprehensive backend API testing for KiriNet Messenger. All 6 core REST API endpoints are working correctly: root endpoint, user creation/retrieval, conversation management, and message handling. MongoDB integration is functioning properly with UUID usage (no ObjectId serialization issues). Global conversation auto-creation for new users verified. Ready for production use."
+-\ No newline at end of file
 diff --git a/test_result.md b/test_result.md
-index 187cba4..3290292 100644
+index 3290292..2314671 100644
 --- a/test_result.md
 +++ b/test_result.md
-@@ -100,4 +100,121 @@
- 
- #====================================================================================================
+@@ -102,92 +102,131 @@
  # Testing Data - Main Agent and testing sub agent both should log testing data below this section
--#====================================================================================================
-\ No newline at end of file
-+#====================================================================================================
+ #====================================================================================================
+ 
+-user_problem_statement: "Test the KiriNet Messenger backend API endpoints for REST API functionality"
++user_problem_statement: "Test the KiriNet Authorization System with SMS, email, and nickname-based authentication"
+ 
+ backend:
+-  - task: "Root API Endpoint"
++  - task: "SMS Registration Flow"
+     implemented: true
+     working: true
+-    file: "backend/server.py"
++    file: "backend/auth_routes.py"
+     stuck_count: 0
+     priority: "high"
+     needs_retesting: false
+     status_history:
+       - working: true
+         agent: "testing"
+-        comment: "✅ GET /api/ endpoint working correctly - returns KiriNet API message as expected"
++        comment: "✅ SMS registration working correctly - SMS code generation, validation, and user registration with phone number authentication complete"
+ 
+-  - task: "User Creation API"
++  - task: "Email Registration"
+     implemented: true
+     working: true
+-    file: "backend/server.py"
++    file: "backend/auth_routes.py"
+     stuck_count: 0
+     priority: "high"
+     needs_retesting: false
+     status_history:
+       - working: true
+         agent: "testing"
+-        comment: "✅ POST /api/users working correctly - creates users with valid UUIDs, proper data structure, and handles duplicate nicknames"
++        comment: "✅ Email registration working correctly - user registration with email and password, proper token generation"
+ 
+-  - task: "Get Users API"
++  - task: "Nickname Registration"
+     implemented: true
+     working: true
+-    file: "backend/server.py"
++    file: "backend/auth_routes.py"
+     stuck_count: 0
+     priority: "high"
+     needs_retesting: false
+     status_history:
+       - working: true
+         agent: "testing"
+-        comment: "✅ GET /api/users working correctly - returns list of users with proper UUID format and required fields"
++        comment: "✅ Nickname registration working correctly - user registration with nickname and password, proper token generation"
+ 
+-  - task: "Get Conversations API"
++  - task: "Login System"
+     implemented: true
+     working: true
+-    file: "backend/server.py"
++    file: "backend/auth_routes.py"
+     stuck_count: 0
+     priority: "high"
+     needs_retesting: false
+     status_history:
+       - working: true
+         agent: "testing"
+-        comment: "✅ GET /api/conversations working correctly - automatically creates global conversation for new users, proper UUID format, users added to participants"
++        comment: "✅ Login system working correctly - SMS-based login tested and working, proper token generation"
+ 
+-  - task: "Get Messages API"
++  - task: "Profile Management"
+     implemented: true
+     working: true
+-    file: "backend/server.py"
++    file: "backend/auth_routes.py"
+     stuck_count: 0
+     priority: "high"
+     needs_retesting: false
+     status_history:
+       - working: true
+         agent: "testing"
+-        comment: "✅ GET /api/messages/{conversationId} working correctly - returns messages list, handles empty conversations properly"
++        comment: "✅ Profile management working correctly - GET /api/auth/me and PUT /api/auth/me endpoints working with proper authentication"
+ 
+-  - task: "Create Message API"
++  - task: "JWT Token System"
+     implemented: true
+     working: true
+-    file: "backend/server.py"
++    file: "backend/auth.py"
+     stuck_count: 0
+     priority: "high"
+     needs_retesting: false
+     status_history:
++      - working: false
++        agent: "testing"
++        comment: "❌ JWT validation had exception handling issue - jwt.JWTError not found"
+       - working: true
+         agent: "testing"
+-        comment: "✅ POST /api/messages working correctly - creates messages with valid UUIDs, proper data structure, message persisted successfully"
++        comment: "✅ JWT token system working correctly - fixed import issues, proper token validation, invalid tokens rejected with 401 status"
+ 
+-  - task: "MongoDB Integration"
++  - task: "Password Hashing"
+     implemented: true
+     working: true
+-    file: "backend/server.py"
++    file: "backend/auth.py"
+     stuck_count: 0
+     priority: "high"
+     needs_retesting: false
+     status_history:
+       - working: true
+         agent: "testing"
+-        comment: "✅ MongoDB integration working correctly - data persistence verified, no ObjectId serialization errors, proper UUID usage throughout"
++        comment: "✅ Password hashing working correctly - bcrypt implementation, secure password storage and verification"
 +
-+user_problem_statement: "Test the KiriNet Messenger backend API endpoints for REST API functionality"
++  - task: "Uniqueness Constraints"
++    implemented: true
++    working: true
++    file: "backend/auth_routes.py"
++    stuck_count: 0
++    priority: "high"
++    needs_retesting: false
++    status_history:
++      - working: true
++        agent: "testing"
++        comment: "✅ Uniqueness constraints working correctly - duplicate nicknames, emails, and phone numbers properly rejected"
 +
-+backend:
++  - task: "Logout System"
++    implemented: true
++    working: true
++    file: "backend/auth_routes.py"
++    stuck_count: 0
++    priority: "high"
++    needs_retesting: false
++    status_history:
++      - working: true
++        agent: "testing"
++        comment: "✅ Logout system working correctly - POST /api/auth/logout updates user status properly"
++
 +  - task: "Root API Endpoint"
 +    implemented: true
 +    working: true
 +    file: "backend/server.py"
 +    stuck_count: 0
-+    priority: "high"
++    priority: "medium"
 +    needs_retesting: false
 +    status_history:
 +      - working: true
 +        agent: "testing"
 +        comment: "✅ GET /api/ endpoint working correctly - returns KiriNet API message as expected"
-+
-+  - task: "User Creation API"
-+    implemented: true
-+    working: true
-+    file: "backend/server.py"
-+    stuck_count: 0
-+    priority: "high"
-+    needs_retesting: false
-+    status_history:
-+      - working: true
-+        agent: "testing"
-+        comment: "✅ POST /api/users working correctly - creates users with valid UUIDs, proper data structure, and handles duplicate nicknames"
-+
-+  - task: "Get Users API"
-+    implemented: true
-+    working: true
-+    file: "backend/server.py"
-+    stuck_count: 0
-+    priority: "high"
-+    needs_retesting: false
-+    status_history:
-+      - working: true
-+        agent: "testing"
-+        comment: "✅ GET /api/users working correctly - returns list of users with proper UUID format and required fields"
-+
-+  - task: "Get Conversations API"
-+    implemented: true
-+    working: true
-+    file: "backend/server.py"
-+    stuck_count: 0
-+    priority: "high"
-+    needs_retesting: false
-+    status_history:
-+      - working: true
-+        agent: "testing"
-+        comment: "✅ GET /api/conversations working correctly - automatically creates global conversation for new users, proper UUID format, users added to participants"
-+
-+  - task: "Get Messages API"
-+    implemented: true
-+    working: true
-+    file: "backend/server.py"
-+    stuck_count: 0
-+    priority: "high"
-+    needs_retesting: false
-+    status_history:
-+      - working: true
-+        agent: "testing"
-+        comment: "✅ GET /api/messages/{conversationId} working correctly - returns messages list, handles empty conversations properly"
-+
-+  - task: "Create Message API"
-+    implemented: true
-+    working: true
-+    file: "backend/server.py"
-+    stuck_count: 0
-+    priority: "high"
-+    needs_retesting: false
-+    status_history:
-+      - working: true
-+        agent: "testing"
-+        comment: "✅ POST /api/messages working correctly - creates messages with valid UUIDs, proper data structure, message persisted successfully"
-+
-+  - task: "MongoDB Integration"
-+    implemented: true
-+    working: true
-+    file: "backend/server.py"
-+    stuck_count: 0
-+    priority: "high"
-+    needs_retesting: false
-+    status_history:
-+      - working: true
-+        agent: "testing"
-+        comment: "✅ MongoDB integration working correctly - data persistence verified, no ObjectId serialization errors, proper UUID usage throughout"
-+
-+frontend:
-+  - task: "Frontend Testing"
-+    implemented: false
-+    working: "NA"
-+    file: "frontend/app"
-+    stuck_count: 0
-+    priority: "low"
-+    needs_retesting: false
-+    status_history:
-+      - working: "NA"
-+        agent: "testing"
-+        comment: "Frontend testing not performed as per testing agent limitations - only backend REST API testing completed"
-+
-+metadata:
-+  created_by: "testing_agent"
-+  version: "1.0"
-+  test_sequence: 1
-+  run_ui: false
-+
-+test_plan:
-+  current_focus:
-+    - "All backend REST API endpoints tested and verified"
-+  stuck_tasks: []
-+  test_all: false
-+  test_priority: "high_first"
-+
-+agent_communication:
-+  - agent: "testing"
-+    message: "Completed comprehensive backend API testing for KiriNet Messenger. All 6 core REST API endpoints are working correctly: root endpoint, user creation/retrieval, conversation management, and message handling. MongoDB integration is functioning properly with UUID usage (no ObjectId serialization issues). Global conversation auto-creation for new users verified. Ready for production use."
+ 
+ frontend:
+   - task: "Frontend Testing"
+@@ -204,17 +243,17 @@ frontend:
+ 
+ metadata:
+   created_by: "testing_agent"
+-  version: "1.0"
+-  test_sequence: 1
++  version: "2.0"
++  test_sequence: 2
+   run_ui: false
+ 
+ test_plan:
+   current_focus:
+-    - "All backend REST API endpoints tested and verified"
++    - "KiriNet Authorization System fully tested and verified"
+   stuck_tasks: []
+   test_all: false
+   test_priority: "high_first"
+ 
+ agent_communication:
+   - agent: "testing"
+-    message: "Completed comprehensive backend API testing for KiriNet Messenger. All 6 core REST API endpoints are working correctly: root endpoint, user creation/retrieval, conversation management, and message handling. MongoDB integration is functioning properly with UUID usage (no ObjectId serialization issues). Global conversation auto-creation for new users verified. Ready for production use."
+\ No newline at end of file
++    message: "Completed comprehensive testing of KiriNet Authorization System. All authentication methods working correctly: SMS registration/login, email registration, nickname registration. JWT token system, password hashing, profile management, and uniqueness constraints all verified. Fixed JWT exception handling issue. System ready for production use with 10/10 tests passing."
 \ No newline at end of file
