@@ -24,15 +24,22 @@ export default function RootLayout() {
 
     const inAuthGroup = segments[0] === 'auth';
     const inTabsGroup = segments[0] === '(tabs)';
+    
+    console.log('Navigation check:', { user: !!user, inAuthGroup, inTabsGroup, segments });
 
-    if (user && !inTabsGroup) {
-      // Пользователь авторизован - перенаправляем в чаты
-      router.replace('/(tabs)/chats');
-    } else if (!user && !inAuthGroup) {
-      // Пользователь не авторизован - перенаправляем на выбор языка
-      router.replace('/auth/language');
-    }
-  }, [user, isReady, segments]);
+    // Небольшая задержка для корректной навигации
+    setTimeout(() => {
+      if (user && !inTabsGroup) {
+        // Пользователь авторизован - перенаправляем в чаты
+        console.log('Redirecting to chats...');
+        router.replace('/(tabs)/chats');
+      } else if (!user && !inAuthGroup && segments[0] !== 'reset') {
+        // Пользователь не авторизован - перенаправляем на выбор языка
+        console.log('Redirecting to auth...');
+        router.replace('/auth/language');
+      }
+    }, 100);
+  }, [user, isReady]);
 
   if (!isReady) {
     return (
