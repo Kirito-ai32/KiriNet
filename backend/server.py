@@ -153,14 +153,22 @@ async def typing(sid, data):
 async def root():
     return {"message": "KiriNet API - キリネット"}
 
-@api_router.post("/users", response_model=User)
-async def create_user(user_input: UserCreate):
+# Старый endpoint для обратной совместимости (временно)
+# Теперь используем /api/auth/register
+@api_router.post("/users", response_model=User, deprecated=True)
+async def create_user_legacy(nickname: str):
+    """
+    Устаревший endpoint. Используйте /api/auth/register
+    Оставлен для обратной совместимости
+    """
     # Check if nickname already exists
-    existing = await db.users.find_one({"nickname": user_input.nickname})
+    existing = await db.users.find_one({"nickname": nickname})
     if existing:
+        if '_id' in existing:
+            del existing['_id']
         return User(**existing)
     
-    user = User(**user_input.dict())
+    user = User(nickname=nickname, language="ru")
     await db.users.insert_one(user.dict())
     
     # Create or get global conversation
