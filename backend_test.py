@@ -82,6 +82,7 @@ class KiriNetAuthTester:
                         token_data = register_response.json()
                         if "access_token" in token_data and "refresh_token" in token_data:
                             self.tokens["sms_user"] = token_data
+                            self.registered_phone = phone  # Store for login test
                             self.log_test("SMS Registration", True, 
                                         f"User {nickname} registered successfully")
                             return True
