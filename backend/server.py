@@ -296,13 +296,6 @@ app.include_router(api_router)
 
 # Подключаем auth routes
 from auth_routes import auth_router
-
-# Создаем dependency для передачи db в auth_router
-async def get_database():
-    return db
-
-# Переопределяем dependency через app
-app.dependency_overrides[lambda: None] = get_database
 app.include_router(auth_router, prefix="/api")
 
 app.add_middleware(
