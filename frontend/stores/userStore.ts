@@ -35,20 +35,28 @@ export const useUserStore = create<UserStore>((set, get) => ({
   user: null,
   tokens: null,
   
-  setUser: async (user: User) => {
-    await AsyncStorage.setItem('user', JSON.stringify(user));
+  setUser: (user: User) => {
+    // Устанавливаем state сразу для немедленной реакции UI
     set({ user });
+    // AsyncStorage в фоне (не блокирует)
+    AsyncStorage.setItem('user', JSON.stringify(user)).catch(console.error);
   },
   
-  setTokens: async (tokens: AuthTokens) => {
-    await AsyncStorage.setItem('tokens', JSON.stringify(tokens));
+  setTokens: (tokens: AuthTokens) => {
+    // Устанавливаем state сразу
     set({ tokens });
+    // AsyncStorage в фоне
+    AsyncStorage.setItem('tokens', JSON.stringify(tokens)).catch(console.error);
   },
   
   setUserAndTokens: async (user: User, tokens: AuthTokens) => {
-    await AsyncStorage.setItem('user', JSON.stringify(user));
-    await AsyncStorage.setItem('tokens', JSON.stringify(tokens));
+    // Устанавливаем state сразу для немедленного редиректа
     set({ user, tokens });
+    // AsyncStorage в фоне
+    Promise.all([
+      AsyncStorage.setItem('user', JSON.stringify(user)),
+      AsyncStorage.setItem('tokens', JSON.stringify(tokens))
+    ]).catch(console.error);
   },
   
   loadUser: async () => {
@@ -63,10 +71,14 @@ export const useUserStore = create<UserStore>((set, get) => ({
     }
   },
   
-  clearUser: async () => {
-    await AsyncStorage.removeItem('user');
-    await AsyncStorage.removeItem('tokens');
+  clearUser: () => {
+    // Очищаем state немедленно для редиректа
     set({ user: null, tokens: null });
+    // AsyncStorage в фоне
+    Promise.all([
+      AsyncStorage.removeItem('user'),
+      AsyncStorage.removeItem('tokens')
+    ]).catch(console.error);
   },
   
   getAccessToken: () => {
