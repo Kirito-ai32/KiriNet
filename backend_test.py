@@ -17,6 +17,7 @@ class KiriNetAuthTester:
         self.session = requests.Session()
         self.test_results = []
         self.tokens = {}
+        self.registered_phone = None
         
     def log_test(self, test_name, success, details="", response_data=None):
         """Log test results"""
