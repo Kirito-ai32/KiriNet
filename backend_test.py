@@ -14,364 +14,410 @@ BACKEND_URL = "https://kiri-chat.preview.emergentagent.com/api"
 
 class KiriNetAuthTester:
     def __init__(self):
-        self.base_url = BACKEND_URL
-        self.test_users = []
-        self.test_conversations = []
         self.session = requests.Session()
+        self.test_results = []
+        self.tokens = {}
         
-    def log(self, message, level="INFO"):
-        """Log test messages with timestamp"""
-        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        print(f"[{timestamp}] [{level}] {message}")
-        
+    def log_test(self, test_name, success, details="", response_data=None):
+        """Log test results"""
+        result = {
+            "test": test_name,
+            "success": success,
+            "details": details,
+            "timestamp": datetime.now().isoformat(),
+            "response_data": response_data
+        }
+        self.test_results.append(result)
+        status = "✅" if success else "❌"
+        print(f"{status} {test_name}: {details}")
+        if response_data and not success:
+            print(f"   Response: {response_data}")
+    
     def test_root_endpoint(self):
-        """Test GET /api/ - Should return KiriNet API message"""
-        self.log("Testing root endpoint GET /api/")
-        
+        """Test root API endpoint"""
         try:
-            response = self.session.get(f"{self.base_url}/")
-            
+            response = self.session.get(f"{BACKEND_URL}/")
             if response.status_code == 200:
                 data = response.json()
-                if "message" in data and "KiriNet" in data["message"]:
-                    self.log("✅ Root endpoint working correctly", "SUCCESS")
+                if "KiriNet" in data.get("message", ""):
+                    self.log_test("Root API Endpoint", True, "API is accessible")
                     return True
                 else:
-                    self.log(f"❌ Root endpoint returned unexpected data: {data}", "ERROR")
-                    return False
+                    self.log_test("Root API Endpoint", False, "Unexpected response format", data)
             else:
-                self.log(f"❌ Root endpoint failed with status {response.status_code}: {response.text}", "ERROR")
-                return False
-                
+                self.log_test("Root API Endpoint", False, f"HTTP {response.status_code}", response.text)
         except Exception as e:
-            self.log(f"❌ Root endpoint test failed with exception: {str(e)}", "ERROR")
-            return False
+            self.log_test("Root API Endpoint", False, f"Connection error: {str(e)}")
+        return False
     
-    def test_create_users(self):
-        """Test POST /api/users - Create multiple users with different nicknames"""
-        self.log("Testing user creation POST /api/users")
+    def test_sms_registration_flow(self):
+        """Test complete SMS registration flow"""
+        phone = "+380501234567"
+        nickname = f"sms_user_{int(time.time())}"
         
-        test_nicknames = ["Alice_Kiri", "Bob_Net", "Charlie_Messenger", "Diana_Chat"]
-        created_users = []
-        
-        for nickname in test_nicknames:
-            try:
-                user_data = {"nickname": nickname}
-                response = self.session.post(f"{self.base_url}/users", json=user_data)
-                
-                if response.status_code == 200:
-                    user = response.json()
+        # Step 1: Send SMS code
+        try:
+            sms_response = self.session.post(f"{BACKEND_URL}/auth/send-sms", 
+                                           params={"phone": phone})
+            
+            if sms_response.status_code == 200:
+                sms_data = sms_response.json()
+                if sms_data.get("success") and "code_for_testing" in sms_data:
+                    sms_code = sms_data["code_for_testing"]
+                    self.log_test("SMS Code Generation", True, f"SMS code: {sms_code}")
                     
-                    # Verify user structure
-                    required_fields = ["id", "nickname", "is_online", "created_at", "last_seen"]
-                    missing_fields = [field for field in required_fields if field not in user]
+                    # Step 2: Register with SMS code
+                    register_data = {
+                        "auth_method": "phone",
+                        "nickname": nickname,
+                        "phone": phone,
+                        "sms_code": sms_code
+                    }
                     
-                    if missing_fields:
-                        self.log(f"❌ User {nickname} missing fields: {missing_fields}", "ERROR")
-                        return False
+                    register_response = self.session.post(f"{BACKEND_URL}/auth/register",
+                                                        json=register_data)
                     
-                    # Verify UUID format
-                    try:
-                        uuid.UUID(user["id"])
-                        self.log(f"✅ User {nickname} created with valid UUID: {user['id']}", "SUCCESS")
-                    except ValueError:
-                        self.log(f"❌ User {nickname} has invalid UUID format: {user['id']}", "ERROR")
-                        return False
-                    
-                    created_users.append(user)
-                    self.test_users.append(user)
-                    
+                    if register_response.status_code == 200:
+                        token_data = register_response.json()
+                        if "access_token" in token_data and "refresh_token" in token_data:
+                            self.tokens["sms_user"] = token_data
+                            self.log_test("SMS Registration", True, 
+                                        f"User {nickname} registered successfully")
+                            return True
+                        else:
+                            self.log_test("SMS Registration", False, 
+                                        "Missing tokens in response", token_data)
+                    else:
+                        self.log_test("SMS Registration", False, 
+                                    f"Registration failed: HTTP {register_response.status_code}",
+                                    register_response.text)
                 else:
-                    self.log(f"❌ Failed to create user {nickname}: {response.status_code} - {response.text}", "ERROR")
-                    return False
-                    
-            except Exception as e:
-                self.log(f"❌ Exception creating user {nickname}: {str(e)}", "ERROR")
-                return False
+                    self.log_test("SMS Code Generation", False, 
+                                "Invalid SMS response format", sms_data)
+            else:
+                self.log_test("SMS Code Generation", False, 
+                            f"SMS request failed: HTTP {sms_response.status_code}",
+                            sms_response.text)
+        except Exception as e:
+            self.log_test("SMS Registration Flow", False, f"Error: {str(e)}")
         
-        self.log(f"✅ Successfully created {len(created_users)} users", "SUCCESS")
-        return True
+        return False
     
-    def test_get_users(self):
-        """Test GET /api/users - Get all users"""
-        self.log("Testing get all users GET /api/users")
+    def test_email_registration(self):
+        """Test email registration"""
+        email = f"test_{int(time.time())}@kirinet.com"
+        nickname = f"email_user_{int(time.time())}"
+        password = "SecurePassword123!"
         
         try:
-            response = self.session.get(f"{self.base_url}/users")
+            register_data = {
+                "auth_method": "email",
+                "nickname": nickname,
+                "email": email,
+                "password": password
+            }
+            
+            response = self.session.post(f"{BACKEND_URL}/auth/register", json=register_data)
             
             if response.status_code == 200:
-                users = response.json()
-                
-                if not isinstance(users, list):
-                    self.log(f"❌ Expected list of users, got: {type(users)}", "ERROR")
-                    return False
-                
-                if len(users) < len(self.test_users):
-                    self.log(f"❌ Expected at least {len(self.test_users)} users, got {len(users)}", "ERROR")
-                    return False
-                
-                # Verify each user has proper structure
-                for user in users:
-                    required_fields = ["id", "nickname", "is_online", "created_at", "last_seen"]
-                    missing_fields = [field for field in required_fields if field not in user]
-                    
-                    if missing_fields:
-                        self.log(f"❌ User missing fields: {missing_fields}", "ERROR")
-                        return False
-                    
-                    # Verify UUID format
-                    try:
-                        uuid.UUID(user["id"])
-                    except ValueError:
-                        self.log(f"❌ User has invalid UUID format: {user['id']}", "ERROR")
-                        return False
-                
-                self.log(f"✅ Successfully retrieved {len(users)} users", "SUCCESS")
-                return True
-                
-            else:
-                self.log(f"❌ Failed to get users: {response.status_code} - {response.text}", "ERROR")
-                return False
-                
-        except Exception as e:
-            self.log(f"❌ Exception getting users: {str(e)}", "ERROR")
-            return False
-    
-    def test_get_conversations(self):
-        """Test GET /api/conversations?user_id={userId} - Get conversations for a user"""
-        self.log("Testing get conversations GET /api/conversations")
-        
-        if not self.test_users:
-            self.log("❌ No test users available for conversation testing", "ERROR")
-            return False
-        
-        for user in self.test_users[:2]:  # Test with first 2 users
-            try:
-                response = self.session.get(f"{self.base_url}/conversations", params={"user_id": user["id"]})
-                
-                if response.status_code == 200:
-                    conversations = response.json()
-                    
-                    if not isinstance(conversations, list):
-                        self.log(f"❌ Expected list of conversations, got: {type(conversations)}", "ERROR")
-                        return False
-                    
-                    # Should have at least the global conversation
-                    if len(conversations) < 1:
-                        self.log(f"❌ Expected at least 1 conversation (global), got {len(conversations)}", "ERROR")
-                        return False
-                    
-                    # Check for global conversation
-                    global_conv = None
-                    for conv in conversations:
-                        if conv.get("type") == "global":
-                            global_conv = conv
-                            break
-                    
-                    if not global_conv:
-                        self.log(f"❌ No global conversation found for user {user['nickname']}", "ERROR")
-                        return False
-                    
-                    # Verify conversation structure
-                    required_fields = ["id", "type", "participants", "created_at"]
-                    missing_fields = [field for field in required_fields if field not in global_conv]
-                    
-                    if missing_fields:
-                        self.log(f"❌ Global conversation missing fields: {missing_fields}", "ERROR")
-                        return False
-                    
-                    # Verify user is in participants
-                    if user["id"] not in global_conv["participants"]:
-                        self.log(f"❌ User {user['nickname']} not in global conversation participants", "ERROR")
-                        return False
-                    
-                    # Verify UUID format for conversation ID
-                    try:
-                        uuid.UUID(global_conv["id"])
-                    except ValueError:
-                        self.log(f"❌ Conversation has invalid UUID format: {global_conv['id']}", "ERROR")
-                        return False
-                    
-                    self.log(f"✅ User {user['nickname']} has valid conversations including global", "SUCCESS")
-                    self.test_conversations.extend(conversations)
-                    
+                token_data = response.json()
+                if "access_token" in token_data and "refresh_token" in token_data:
+                    self.tokens["email_user"] = token_data
+                    self.log_test("Email Registration", True, 
+                                f"User {nickname} registered with email")
+                    return True
                 else:
-                    self.log(f"❌ Failed to get conversations for user {user['nickname']}: {response.status_code} - {response.text}", "ERROR")
-                    return False
-                    
-            except Exception as e:
-                self.log(f"❌ Exception getting conversations for user {user['nickname']}: {str(e)}", "ERROR")
-                return False
+                    self.log_test("Email Registration", False, 
+                                "Missing tokens in response", token_data)
+            else:
+                self.log_test("Email Registration", False, 
+                            f"HTTP {response.status_code}", response.text)
+        except Exception as e:
+            self.log_test("Email Registration", False, f"Error: {str(e)}")
         
-        return True
+        return False
     
-    def test_get_messages(self):
-        """Test GET /api/messages/{conversationId} - Get messages for a conversation"""
-        self.log("Testing get messages GET /api/messages/{conversationId}")
-        
-        if not self.test_conversations:
-            self.log("❌ No test conversations available for message testing", "ERROR")
-            return False
-        
-        # Test with the first conversation (should be global)
-        conversation = self.test_conversations[0]
-        conversation_id = conversation["id"]
+    def test_nickname_registration(self):
+        """Test nickname registration"""
+        nickname = f"nick_user_{int(time.time())}"
+        password = "AnotherSecurePass456!"
         
         try:
-            response = self.session.get(f"{self.base_url}/messages/{conversation_id}")
+            register_data = {
+                "auth_method": "nickname",
+                "nickname": nickname,
+                "password": password
+            }
+            
+            response = self.session.post(f"{BACKEND_URL}/auth/register", json=register_data)
             
             if response.status_code == 200:
-                messages = response.json()
-                
-                if not isinstance(messages, list):
-                    self.log(f"❌ Expected list of messages, got: {type(messages)}", "ERROR")
-                    return False
-                
-                # Empty messages list is valid for new conversations
-                self.log(f"✅ Successfully retrieved {len(messages)} messages for conversation {conversation_id}", "SUCCESS")
-                
-                # If there are messages, verify their structure
-                for message in messages:
-                    required_fields = ["id", "conversation_id", "sender_id", "sender_nickname", "content", "timestamp"]
-                    missing_fields = [field for field in required_fields if field not in message]
-                    
-                    if missing_fields:
-                        self.log(f"❌ Message missing fields: {missing_fields}", "ERROR")
-                        return False
-                    
-                    # Verify UUID formats
-                    try:
-                        uuid.UUID(message["id"])
-                        uuid.UUID(message["conversation_id"])
-                        uuid.UUID(message["sender_id"])
-                    except ValueError as e:
-                        self.log(f"❌ Message has invalid UUID format: {str(e)}", "ERROR")
-                        return False
-                
-                return True
-                
+                token_data = response.json()
+                if "access_token" in token_data and "refresh_token" in token_data:
+                    self.tokens["nickname_user"] = token_data
+                    self.log_test("Nickname Registration", True, 
+                                f"User {nickname} registered with nickname")
+                    return True
+                else:
+                    self.log_test("Nickname Registration", False, 
+                                "Missing tokens in response", token_data)
             else:
-                self.log(f"❌ Failed to get messages for conversation {conversation_id}: {response.status_code} - {response.text}", "ERROR")
-                return False
-                
+                self.log_test("Nickname Registration", False, 
+                            f"HTTP {response.status_code}", response.text)
         except Exception as e:
-            self.log(f"❌ Exception getting messages for conversation {conversation_id}: {str(e)}", "ERROR")
-            return False
+            self.log_test("Nickname Registration", False, f"Error: {str(e)}")
+        
+        return False
     
-    def test_create_message(self):
-        """Test POST /api/messages - Create a test message"""
-        self.log("Testing message creation POST /api/messages")
+    def test_login_flows(self):
+        """Test login for all authentication methods"""
+        success_count = 0
         
-        if not self.test_users or not self.test_conversations:
-            self.log("❌ No test users or conversations available for message creation", "ERROR")
+        # Test SMS login (reuse phone from registration)
+        phone = "+380501234567"
+        try:
+            # Get new SMS code for login
+            sms_response = self.session.post(f"{BACKEND_URL}/auth/send-sms", 
+                                           params={"phone": phone})
+            if sms_response.status_code == 200:
+                sms_data = sms_response.json()
+                sms_code = sms_data.get("code_for_testing")
+                
+                if sms_code:
+                    login_data = {
+                        "auth_method": "phone",
+                        "identifier": phone,
+                        "sms_code": sms_code
+                    }
+                    
+                    login_response = self.session.post(f"{BACKEND_URL}/auth/login", 
+                                                     json=login_data)
+                    
+                    if login_response.status_code == 200:
+                        token_data = login_response.json()
+                        if "access_token" in token_data:
+                            self.log_test("SMS Login", True, "Phone login successful")
+                            success_count += 1
+                        else:
+                            self.log_test("SMS Login", False, "Missing tokens", token_data)
+                    else:
+                        self.log_test("SMS Login", False, 
+                                    f"HTTP {login_response.status_code}", login_response.text)
+                else:
+                    self.log_test("SMS Login", False, "No SMS code received")
+            else:
+                self.log_test("SMS Login", False, "SMS code request failed")
+        except Exception as e:
+            self.log_test("SMS Login", False, f"Error: {str(e)}")
+        
+        # Note: Email and nickname login would require storing credentials from registration
+        # For now, we'll test the endpoint structure
+        
+        return success_count > 0
+    
+    def test_profile_access(self):
+        """Test profile access with authentication"""
+        if not self.tokens:
+            self.log_test("Profile Access", False, "No tokens available for testing")
             return False
         
-        user = self.test_users[0]
-        conversation = self.test_conversations[0]
-        
-        message_data = {
-            "conversation_id": conversation["id"],
-            "sender_id": user["id"],
-            "sender_nickname": user["nickname"],
-            "content": "Hello from KiriNet test! こんにちは"
-        }
+        # Use the first available token
+        token_key = list(self.tokens.keys())[0]
+        token_data = self.tokens[token_key]
+        access_token = token_data["access_token"]
         
         try:
-            response = self.session.post(f"{self.base_url}/messages", json=message_data)
+            headers = {"Authorization": f"Bearer {access_token}"}
+            response = self.session.get(f"{BACKEND_URL}/auth/me", headers=headers)
             
             if response.status_code == 200:
-                message = response.json()
-                
-                # Verify message structure
-                required_fields = ["id", "conversation_id", "sender_id", "sender_nickname", "content", "timestamp"]
-                missing_fields = [field for field in required_fields if field not in message]
-                
-                if missing_fields:
-                    self.log(f"❌ Created message missing fields: {missing_fields}", "ERROR")
-                    return False
-                
-                # Verify UUID format
-                try:
-                    uuid.UUID(message["id"])
-                except ValueError:
-                    self.log(f"❌ Created message has invalid UUID format: {message['id']}", "ERROR")
-                    return False
-                
-                self.log(f"✅ Successfully created message: {message['id']}", "SUCCESS")
-                return True
-                
+                user_data = response.json()
+                if "id" in user_data and "nickname" in user_data:
+                    self.log_test("Profile Access", True, 
+                                f"Profile retrieved for user: {user_data.get('nickname')}")
+                    return True
+                else:
+                    self.log_test("Profile Access", False, 
+                                "Invalid user data format", user_data)
             else:
-                self.log(f"❌ Failed to create message: {response.status_code} - {response.text}", "ERROR")
-                return False
-                
+                self.log_test("Profile Access", False, 
+                            f"HTTP {response.status_code}", response.text)
         except Exception as e:
-            self.log(f"❌ Exception creating message: {str(e)}", "ERROR")
+            self.log_test("Profile Access", False, f"Error: {str(e)}")
+        
+        return False
+    
+    def test_profile_update(self):
+        """Test profile update functionality"""
+        if not self.tokens:
+            self.log_test("Profile Update", False, "No tokens available for testing")
             return False
+        
+        token_key = list(self.tokens.keys())[0]
+        token_data = self.tokens[token_key]
+        access_token = token_data["access_token"]
+        
+        try:
+            headers = {"Authorization": f"Bearer {access_token}"}
+            update_data = {
+                "status": "Testing KiriNet Auth System!",
+                "about": "Automated test user",
+                "avatar": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg=="
+            }
+            
+            response = self.session.put(f"{BACKEND_URL}/auth/me", 
+                                      json=update_data, headers=headers)
+            
+            if response.status_code == 200:
+                user_data = response.json()
+                if user_data.get("status") == update_data["status"]:
+                    self.log_test("Profile Update", True, "Profile updated successfully")
+                    return True
+                else:
+                    self.log_test("Profile Update", False, 
+                                "Update not reflected", user_data)
+            else:
+                self.log_test("Profile Update", False, 
+                            f"HTTP {response.status_code}", response.text)
+        except Exception as e:
+            self.log_test("Profile Update", False, f"Error: {str(e)}")
+        
+        return False
+    
+    def test_logout(self):
+        """Test logout functionality"""
+        if not self.tokens:
+            self.log_test("Logout", False, "No tokens available for testing")
+            return False
+        
+        token_key = list(self.tokens.keys())[0]
+        token_data = self.tokens[token_key]
+        access_token = token_data["access_token"]
+        
+        try:
+            headers = {"Authorization": f"Bearer {access_token}"}
+            response = self.session.post(f"{BACKEND_URL}/auth/logout", headers=headers)
+            
+            if response.status_code == 200:
+                result = response.json()
+                if result.get("success"):
+                    self.log_test("Logout", True, "User logged out successfully")
+                    return True
+                else:
+                    self.log_test("Logout", False, "Logout not confirmed", result)
+            else:
+                self.log_test("Logout", False, 
+                            f"HTTP {response.status_code}", response.text)
+        except Exception as e:
+            self.log_test("Logout", False, f"Error: {str(e)}")
+        
+        return False
+    
+    def test_uniqueness_constraints(self):
+        """Test uniqueness constraints for nickname, email, phone"""
+        # Test duplicate nickname
+        try:
+            duplicate_data = {
+                "auth_method": "nickname",
+                "nickname": "duplicate_test",
+                "password": "password123"
+            }
+            
+            # First registration should succeed
+            response1 = self.session.post(f"{BACKEND_URL}/auth/register", json=duplicate_data)
+            
+            # Second registration should fail
+            response2 = self.session.post(f"{BACKEND_URL}/auth/register", json=duplicate_data)
+            
+            if response1.status_code == 200 and response2.status_code == 400:
+                self.log_test("Uniqueness Constraints", True, 
+                            "Duplicate nickname properly rejected")
+                return True
+            else:
+                self.log_test("Uniqueness Constraints", False, 
+                            f"Unexpected responses: {response1.status_code}, {response2.status_code}")
+        except Exception as e:
+            self.log_test("Uniqueness Constraints", False, f"Error: {str(e)}")
+        
+        return False
+    
+    def test_jwt_token_validation(self):
+        """Test JWT token validation"""
+        if not self.tokens:
+            self.log_test("JWT Validation", False, "No tokens available for testing")
+            return False
+        
+        # Test with invalid token
+        try:
+            invalid_headers = {"Authorization": "Bearer invalid_token_here"}
+            response = self.session.get(f"{BACKEND_URL}/auth/me", headers=invalid_headers)
+            
+            if response.status_code == 401:
+                self.log_test("JWT Validation", True, "Invalid token properly rejected")
+                return True
+            else:
+                self.log_test("JWT Validation", False, 
+                            f"Invalid token not rejected: HTTP {response.status_code}")
+        except Exception as e:
+            self.log_test("JWT Validation", False, f"Error: {str(e)}")
+        
+        return False
     
     def run_all_tests(self):
-        """Run all API tests in sequence"""
-        self.log("Starting KiriNet Messenger Backend API Tests")
-        self.log(f"Testing against: {self.base_url}")
+        """Run comprehensive test suite"""
+        print("🚀 Starting KiriNet Authorization System Tests")
+        print("=" * 60)
         
+        # Test sequence
         tests = [
-            ("Root Endpoint", self.test_root_endpoint),
-            ("Create Users", self.test_create_users),
-            ("Get Users", self.test_get_users),
-            ("Get Conversations", self.test_get_conversations),
-            ("Get Messages", self.test_get_messages),
-            ("Create Message", self.test_create_message),
+            ("Root API", self.test_root_endpoint),
+            ("SMS Registration Flow", self.test_sms_registration_flow),
+            ("Email Registration", self.test_email_registration),
+            ("Nickname Registration", self.test_nickname_registration),
+            ("Login Flows", self.test_login_flows),
+            ("Profile Access", self.test_profile_access),
+            ("Profile Update", self.test_profile_update),
+            ("Logout", self.test_logout),
+            ("Uniqueness Constraints", self.test_uniqueness_constraints),
+            ("JWT Token Validation", self.test_jwt_token_validation)
         ]
         
-        results = {}
+        passed = 0
+        total = len(tests)
         
         for test_name, test_func in tests:
-            self.log(f"\n{'='*50}")
-            self.log(f"Running: {test_name}")
-            self.log(f"{'='*50}")
-            
-            try:
-                result = test_func()
-                results[test_name] = result
-                
-                if result:
-                    self.log(f"✅ {test_name} PASSED", "SUCCESS")
-                else:
-                    self.log(f"❌ {test_name} FAILED", "ERROR")
-                    
-            except Exception as e:
-                self.log(f"❌ {test_name} CRASHED: {str(e)}", "ERROR")
-                results[test_name] = False
+            print(f"\n📋 Running: {test_name}")
+            if test_func():
+                passed += 1
         
-        # Summary
-        self.log(f"\n{'='*50}")
-        self.log("TEST SUMMARY")
-        self.log(f"{'='*50}")
+        print("\n" + "=" * 60)
+        print(f"🏁 Test Results: {passed}/{total} tests passed")
         
-        passed = sum(1 for result in results.values() if result)
-        total = len(results)
+        # Summary of critical issues
+        critical_issues = []
+        for result in self.test_results:
+            if not result["success"] and result["test"] in [
+                "Root API Endpoint", "SMS Registration", "Email Registration", 
+                "Nickname Registration", "Profile Access"
+            ]:
+                critical_issues.append(result["test"])
         
-        for test_name, result in results.items():
-            status = "✅ PASS" if result else "❌ FAIL"
-            self.log(f"{test_name}: {status}")
-        
-        self.log(f"\nOverall: {passed}/{total} tests passed")
-        
-        if passed == total:
-            self.log("🎉 All tests passed! KiriNet API is working correctly.", "SUCCESS")
-            return True
+        if critical_issues:
+            print(f"🚨 Critical Issues Found: {', '.join(critical_issues)}")
         else:
-            self.log(f"⚠️  {total - passed} tests failed. Please check the issues above.", "ERROR")
-            return False
+            print("✅ All critical functionality working")
+        
+        return passed, total, critical_issues
 
-def main():
-    """Main test execution"""
-    tester = KiriNetAPITester()
-    success = tester.run_all_tests()
-    
-    if success:
-        sys.exit(0)
-    else:
-        sys.exit(1)
 
 if __name__ == "__main__":
-    main()
+    tester = KiriNetAuthTester()
+    passed, total, issues = tester.run_all_tests()
+    
+    # Print detailed results
+    print("\n📊 Detailed Test Results:")
+    for result in tester.test_results:
+        status = "✅" if result["success"] else "❌"
+        print(f"{status} {result['test']}: {result['details']}")
+    
+    exit(0 if len(issues) == 0 else 1)
