@@ -11,30 +11,46 @@ import {
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useUserStore } from '../../stores/userStore';
+import { api } from '../../services/api';
 import { colors, spacing, borderRadius, fonts } from '../../constants/theme';
 
 export default function SettingsScreen() {
   const router = useRouter();
-  const { user, clearUser } = useUserStore();
+  const { user, clearUser, getAccessToken } = useUserStore();
   const [notifications, setNotifications] = useState(true);
   const [darkMode, setDarkMode] = useState(true);
   const [soundEnabled, setSoundEnabled] = useState(true);
+  const [loading, setLoading] = useState(false);
 
   const handleLogout = () => {
     Alert.alert(
-      'ログアウト / Logout',
-      '本当にログアウトしますか？ / Are you sure you want to logout?',
+      'Выход / Logout',
+      'Вы уверены, что хотите выйти? / Are you sure you want to logout?',
       [
         {
-          text: 'キャンセル / Cancel',
+          text: 'Отмена / Cancel',
           style: 'cancel',
         },
         {
-          text: 'ログアウト / Logout',
+          text: 'Выйти / Logout',
           style: 'destructive',
           onPress: async () => {
-            await clearUser();
-            router.replace('/');
+            setLoading(true);
+            try {
+              const token = getAccessToken();
+              if (token) {
+                await api.logout(token);
+              }
+              await clearUser();
+              router.replace('/');
+            } catch (error) {
+              console.error('Logout error:', error);
+              // Все равно очищаем локальные данные
+              await clearUser();
+              router.replace('/');
+            } finally {
+              setLoading(false);
+            }
           },
         },
       ]
