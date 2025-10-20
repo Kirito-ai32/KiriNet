@@ -1,41 +1,10 @@
-import React, { useState, useEffect } from 'react';
-import {
-  View,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  StyleSheet,
-  KeyboardAvoidingView,
-  Platform,
-  ActivityIndicator,
-  Animated,
-} from 'react-native';
-import { useRouter } from 'expo-router';
-import { LinearGradient } from 'expo-linear-gradient';
-import { useUserStore } from '../stores/userStore';
-import { api } from '../services/api';
-import { colors, spacing, borderRadius, fonts } from '../constants/theme';
+import React from 'react';
+import { View, ActivityIndicator, StyleSheet } from 'react-native';
+import { colors } from '../constants/theme';
 
-export default function NicknameScreen() {
-  const router = useRouter();
-  const { user, setUser } = useUserStore();
-  const [nickname, setNickname] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [fadeAnim] = useState(new Animated.Value(0));
-  const [scaleAnim] = useState(new Animated.Value(0.8));
-
-  useEffect(() => {
-    // Небольшая задержка чтобы Root Layout успел смонтироваться
-    const timer = setTimeout(() => {
-      if (user) {
-        router.replace('/(tabs)/chats');
-      } else {
-        router.replace('/auth/language');
-      }
-    }, 100);
-
-    return () => clearTimeout(timer);
-  }, [user]);
+// Этот экран используется только как заглушка
+// Реальная навигация происходит в _layout.tsx
+export default function IndexScreen() {
 
   const handleContinue = async () => {
     if (!nickname.trim()) return;
