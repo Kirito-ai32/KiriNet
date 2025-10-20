@@ -27,7 +27,9 @@ sms_codes_storage = {}
 
 def get_db():
     """Dependency для получения БД - будет переопределен в main"""
-    pass
+    # Этот метод будет заменен через параметры
+    from server import db as database
+    return database
 
 
 @auth_router.post("/send-sms", summary="Отправка SMS кода")
