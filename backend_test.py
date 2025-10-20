@@ -319,9 +319,10 @@ class KiriNetAuthTester:
         """Test uniqueness constraints for nickname, email, phone"""
         # Test duplicate nickname
         try:
+            unique_nickname = f"duplicate_test_{int(time.time())}"
             duplicate_data = {
                 "auth_method": "nickname",
-                "nickname": "duplicate_test",
+                "nickname": unique_nickname,
                 "password": "password123"
             }
             
