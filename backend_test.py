@@ -173,8 +173,8 @@ class KiriNetAuthTester:
         """Test login for all authentication methods"""
         success_count = 0
         
-        # Test SMS login (reuse phone from registration)
-        phone = "+380501234567"
+        # Test SMS login (use a phone that should be registered)
+        phone = f"+38050123{int(time.time()) % 10000:04d}"
         try:
             # Get new SMS code for login
             sms_response = self.session.post(f"{BACKEND_URL}/auth/send-sms", 
