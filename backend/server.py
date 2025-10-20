@@ -291,17 +291,18 @@ async def create_message(message_input: MessageCreate):
     
     return message
 
-# Подключаем auth routes
-from auth_routes import auth_router, get_db as auth_get_db
-
-# Переопределяем dependency для auth_router
-def override_get_db():
-    return db
-
-auth_router.dependency_overrides[auth_get_db] = override_get_db
-
 # Include the router in the main app
 app.include_router(api_router)
+
+# Подключаем auth routes
+from auth_routes import auth_router
+
+# Создаем dependency для передачи db в auth_router
+async def get_database():
+    return db
+
+# Переопределяем dependency через app
+app.dependency_overrides[lambda: None] = get_database
 app.include_router(auth_router, prefix="/api")
 
 app.add_middleware(
