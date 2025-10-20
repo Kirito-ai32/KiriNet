@@ -26,21 +26,10 @@ export default function NicknameScreen() {
 
   useEffect(() => {
     if (user) {
-      router.replace('/chats');
+      router.replace('/(tabs)/chats');
     } else {
-      Animated.parallel([
-        Animated.timing(fadeAnim, {
-          toValue: 1,
-          duration: 800,
-          useNativeDriver: true,
-        }),
-        Animated.spring(scaleAnim, {
-          toValue: 1,
-          tension: 20,
-          friction: 7,
-          useNativeDriver: true,
-        }),
-      ]).start();
+      // Перенаправляем на выбор языка
+      router.replace('/auth/language');
     }
   }, [user]);
 
