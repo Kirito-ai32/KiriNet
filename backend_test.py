@@ -52,7 +52,7 @@ class KiriNetAuthTester:
     
     def test_sms_registration_flow(self):
         """Test complete SMS registration flow"""
-        phone = "+380501234567"
+        phone = f"+38050123{int(time.time()) % 10000:04d}"
         nickname = f"sms_user_{int(time.time())}"
         
         # Step 1: Send SMS code
