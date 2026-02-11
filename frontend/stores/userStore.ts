@@ -23,66 +23,114 @@ interface AuthTokens {
 interface UserStore {
   user: User | null;
   tokens: AuthTokens | null;
-  setUser: (user: User) => void;
-  setTokens: (tokens: AuthTokens) => void;
+  isLoaded: boolean;
+
+  setUser: (user: User) => Promise<void>;
+  setTokens: (tokens: AuthTokens) => Promise<void>;
   setUserAndTokens: (user: User, tokens: AuthTokens) => Promise<void>;
+
   loadUser: () => Promise<void>;
   clearUser: () => Promise<void>;
+
   getAccessToken: () => string | null;
 }
 
 export const useUserStore = create<UserStore>((set, get) => ({
+
   user: null,
   tokens: null,
-  
-  setUser: (user: User) => {
-    // Устанавливаем state сразу для немедленной реакции UI
-    set({ user });
-    // AsyncStorage в фоне (не блокирует)
-    AsyncStorage.setItem('user', JSON.stringify(user)).catch(console.error);
+  isLoaded: false,
+
+  setUser: async (user: User) => {
+    try {
+      await AsyncStorage.setItem('user', JSON.stringify(user));
+      set({ user });
+    } catch (error) {
+      console.error('setUser error:', error);
+    }
   },
-  
-  setTokens: (tokens: AuthTokens) => {
-    // Устанавливаем state сразу
-    set({ tokens });
-    // AsyncStorage в фоне
-    AsyncStorage.setItem('tokens', JSON.stringify(tokens)).catch(console.error);
+
+  setTokens: async (tokens: AuthTokens) => {
+    try {
+      await AsyncStorage.setItem('tokens', JSON.stringify(tokens));
+      set({ tokens });
+    } catch (error) {
+      console.error('setTokens error:', error);
+    }
   },
-  
+
   setUserAndTokens: async (user: User, tokens: AuthTokens) => {
-    // Устанавливаем state сразу для немедленного редиректа
-    set({ user, tokens });
-    // AsyncStorage в фоне
-    Promise.all([
-      AsyncStorage.setItem('user', JSON.stringify(user)),
-      AsyncStorage.setItem('tokens', JSON.stringify(tokens))
-    ]).catch(console.error);
+    try {
+      await AsyncStorage.setItem('user', JSON.stringify(user));
+      await AsyncStorage.setItem('tokens', JSON.stringify(tokens));
+
+      set({
+        user,
+        tokens,
+      });
+
+    } catch (error) {
+      console.error('setUserAndTokens error:', error);
+    }
   },
-  
+
   loadUser: async () => {
-    const userStr = await AsyncStorage.getItem('user');
-    const tokensStr = await AsyncStorage.getItem('tokens');
-    
-    if (userStr) {
-      set({ user: JSON.parse(userStr) });
-    }
-    if (tokensStr) {
-      set({ tokens: JSON.parse(tokensStr) });
+    try {
+
+      const userStr = await AsyncStorage.getItem('user');
+      const tokensStr = await AsyncStorage.getItem('tokens');
+
+      let user = null;
+      let tokens = null;
+
+      if (userStr) {
+        user = JSON.parse(userStr);
+      }
+
+      if (tokensStr) {
+        tokens = JSON.parse(tokensStr);
+      }
+
+      set({
+        user,
+        tokens,
+        isLoaded: true,
+      });
+
+    } catch (error) {
+      console.error('loadUser error:', error);
+
+      set({
+        user: null,
+        tokens: null,
+        isLoaded: true,
+      });
     }
   },
-  
-  clearUser: () => {
-    // Очищаем state немедленно для редиректа
-    set({ user: null, tokens: null });
-    // AsyncStorage в фоне
-    Promise.all([
-      AsyncStorage.removeItem('user'),
-      AsyncStorage.removeItem('tokens')
-    ]).catch(console.error);
+
+  clearUser: async () => {
+    try {
+
+      // Удаляем из AsyncStorage полностью
+      await AsyncStorage.removeItem('user');
+      await AsyncStorage.removeItem('tokens');
+
+      // Очищаем Zustand state
+      set({
+        user: null,
+        tokens: null,
+      });
+
+      console.log('User logged out successfully');
+
+    } catch (error) {
+      console.error('clearUser error:', error);
+    }
   },
-  
+
   getAccessToken: () => {
     const state = get();
     return state.tokens?.access_token || null;
   },
+
 }));
