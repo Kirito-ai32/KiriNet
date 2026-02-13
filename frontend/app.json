@@ -53,6 +53,9 @@
       "router": {
         "origin": false
       },
+"extra": {
+  "EXPO_PUBLIC_BACKEND_URL": "https://kirinet-api.emergentagent.com"
+}
       "eas": {
         "projectId": "your-project-id-here"
       }
