@@ -1,18 +1,18 @@
 import React, { useState } from 'react';
 import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  Switch,
-  ScrollView,
   Alert,
+  ScrollView,
+  StyleSheet,
+  Switch,
+  Text,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useUserStore } from '../../stores/userStore';
 import { api } from '../../services/api';
-import { colors, spacing, borderRadius, fonts } from '../../constants/theme';
+import { borderRadius, colors, fonts, spacing } from '../../constants/theme';
 
 export default function SettingsScreen() {
   const router = useRouter();
@@ -20,41 +20,31 @@ export default function SettingsScreen() {
   const [notifications, setNotifications] = useState(true);
   const [darkMode, setDarkMode] = useState(true);
   const [soundEnabled, setSoundEnabled] = useState(true);
-  const [loading, setLoading] = useState(false);
 
   const handleLogout = () => {
-    Alert.alert(
-      'Выход / Logout',
-      'Вы уверены, что хотите выйти? / Are you sure you want to logout?',
-      [
-        {
-          text: 'Отмена / Cancel',
-          style: 'cancel',
-        },
-        {
-          text: 'Выйти / Logout',
-          style: 'destructive',
-          onPress: async () => {
-            setLoading(true);
-            try {
-              const token = getAccessToken();
-              if (token) {
-                await api.logout(token);
-              }
-              await clearUser();
-              router.replace('/');
-            } catch (error) {
-              console.error('Logout error:', error);
-              // Все равно очищаем локальные данные
-              await clearUser();
-              router.replace('/');
-            } finally {
-              setLoading(false);
+    Alert.alert('Выход / Logout', 'Вы уверены, что хотите выйти?', [
+      {
+        text: 'Отмена',
+        style: 'cancel',
+      },
+      {
+        text: 'Выйти',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            const token = getAccessToken();
+            if (token) {
+              await api.logout(token);
             }
-          },
+            await clearUser();
+            router.replace('/');
+          } catch {
+            await clearUser();
+            router.replace('/');
+          }
         },
-      ]
-    );
+      },
+    ]);
   };
 
   const SettingItem = ({
@@ -100,7 +90,7 @@ export default function SettingsScreen() {
   return (
     <ScrollView style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>設定</Text>
+        <Text style={styles.headerTitle}>Настройки</Text>
         <Text style={styles.headerSubtitle}>Settings</Text>
       </View>
 
@@ -115,64 +105,56 @@ export default function SettingsScreen() {
       </View>
 
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>通知 / Notifications</Text>
+        <Text style={styles.sectionTitle}>Уведомления / Notifications</Text>
         <SettingItem
           icon="notifications"
-          title="プッシュ通知 / Push Notifications"
-          subtitle="新しいメッセージの通知"
+          title="Push-уведомления"
+          subtitle="Показывать новые сообщения"
           value={notifications}
           onValueChange={setNotifications}
         />
         <SettingItem
           icon="volume-high"
-          title="サウンド / Sound"
-          subtitle="メッセージ音を有効にする"
+          title="Звук"
+          subtitle="Проигрывать звук входящих сообщений"
           value={soundEnabled}
           onValueChange={setSoundEnabled}
         />
       </View>
 
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>外観 / Appearance</Text>
+        <Text style={styles.sectionTitle}>Внешний вид / Appearance</Text>
         <SettingItem
           icon="moon"
-          title="ダークモード / Dark Mode"
-          subtitle="サイバーパンクテーマ"
+          title="Темная тема"
+          subtitle="Использовать тёмное оформление"
           value={darkMode}
           onValueChange={setDarkMode}
         />
       </View>
 
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>情報 / Information</Text>
+        <Text style={styles.sectionTitle}>Информация / Information</Text>
         <SettingItem
           icon="information-circle"
-          title="バージョン / Version"
+          title="Версия"
           subtitle="KiriNet v1.0.0"
           type="button"
         />
-        <SettingItem
-          icon="document-text"
-          title="利用規約 / Terms of Service"
-          type="button"
-        />
-        <SettingItem
-          icon="shield-checkmark"
-          title="プライバシー / Privacy Policy"
-          type="button"
-        />
+        <SettingItem icon="document-text" title="Условия использования" type="button" />
+        <SettingItem icon="shield-checkmark" title="Политика конфиденциальности" type="button" />
       </View>
 
       <View style={styles.section}>
         <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
           <Ionicons name="log-out" size={20} color={colors.error} />
-          <Text style={styles.logoutText}>ログアウト / Logout</Text>
+          <Text style={styles.logoutText}>Выйти</Text>
         </TouchableOpacity>
       </View>
 
       <View style={styles.footer}>
-        <Text style={styles.footerText}>キリネット / KiriNet</Text>
-        <Text style={styles.footerSubtext}>日本のサイバーパンクメッセンジャー</Text>
+        <Text style={styles.footerText}>KiriNet</Text>
+        <Text style={styles.footerSubtext}>Японский киберпанк-мессенджер</Text>
       </View>
     </ScrollView>
   );

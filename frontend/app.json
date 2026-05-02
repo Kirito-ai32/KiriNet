@@ -10,11 +10,6 @@
     "newArchEnabled": true,
     "primaryColor": "#b300ff",
     "description": "Japanese Cyberpunk Messenger - キリネット",
-    "ios": {
-      "supportsTablet": true,
-      "bundleIdentifier": "com.kirinet.messenger",
-      "buildNumber": "1"
-    },
     "android": {
       "package": "com.kirinet.messenger",
       "versionCode": 1,
@@ -38,7 +33,7 @@
       "expo-router",
       [
         "expo-splash-screen",
-        {
+         {
           "image": "./assets/images/splash-icon.png",
           "imageWidth": 200,
           "resizeMode": "contain",
@@ -53,11 +48,9 @@
       "router": {
         "origin": false
       },
-"extra": {
-  "EXPO_PUBLIC_BACKEND_URL": "https://kirinet-api.emergentagent.com"
-}
+      "EXPO_PUBLIC_BACKEND_URL": "https://YOUR_BACKEND_URL",
       "eas": {
-        "projectId": "your-project-id-here"
+        "projectId": "4b74e026-2c2d-4aa9-ace3-f4c72b18c16c"
       }
     }
   }

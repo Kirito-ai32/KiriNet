@@ -1,14 +1,14 @@
 import React, { useState } from 'react';
 import {
-  View,
+  Animated,
+  StyleSheet,
   Text,
   TouchableOpacity,
-  StyleSheet,
-  Animated,
+  View,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { colors, spacing, borderRadius, fonts } from '../../constants/theme';
+import { borderRadius, colors, fonts, spacing } from '../../constants/theme';
 
 export default function AuthMethodScreen() {
   const router = useRouter();
@@ -29,16 +29,13 @@ export default function AuthMethodScreen() {
   return (
     <View style={styles.container}>
       <Animated.View style={[styles.content, { opacity: fadeAnim }]}>
-        <TouchableOpacity
-          style={styles.backButton}
-          onPress={() => router.back()}
-        >
+        <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
           <Ionicons name="arrow-back" size={24} color={colors.text} />
         </TouchableOpacity>
 
         <View style={styles.header}>
-          <Text style={styles.logo}>キリネット</Text>
-          <Text style={styles.logoSub}>KiriNet</Text>
+          <Text style={styles.logo}>KiriNet</Text>
+          <Text style={styles.logoSub}>Messenger</Text>
           <View style={styles.glowLine} />
         </View>
 
@@ -50,42 +47,54 @@ export default function AuthMethodScreen() {
             style={styles.methodButton}
             onPress={() => handleMethodSelect('phone')}
           >
-            <View style={[styles.methodIcon, { backgroundColor: colors.primary + '20' }]}>
+            <View style={[styles.methodIcon, { backgroundColor: `${colors.primary}20` }]}>
               <Ionicons name="call" size={32} color={colors.primary} />
             </View>
             <View style={styles.methodInfo}>
               <Text style={styles.methodTitle}>Телефон / Phone</Text>
-              <Text style={styles.methodDesc}>SMS код для подтверждения</Text>
+              <Text style={styles.methodDesc}>SMS-код для подтверждения</Text>
             </View>
-            <Ionicons name="chevron-forward" size={24} color={colors.textSecondary} />
+            <Ionicons
+              name="chevron-forward"
+              size={24}
+              color={colors.textSecondary}
+            />
           </TouchableOpacity>
 
           <TouchableOpacity
             style={styles.methodButton}
             onPress={() => handleMethodSelect('email')}
           >
-            <View style={[styles.methodIcon, { backgroundColor: colors.secondary + '20' }]}>
+            <View style={[styles.methodIcon, { backgroundColor: `${colors.secondary}20` }]}>
               <Ionicons name="mail" size={32} color={colors.secondary} />
             </View>
             <View style={styles.methodInfo}>
               <Text style={styles.methodTitle}>Email</Text>
               <Text style={styles.methodDesc}>Email и пароль</Text>
             </View>
-            <Ionicons name="chevron-forward" size={24} color={colors.textSecondary} />
+            <Ionicons
+              name="chevron-forward"
+              size={24}
+              color={colors.textSecondary}
+            />
           </TouchableOpacity>
 
           <TouchableOpacity
             style={styles.methodButton}
             onPress={() => handleMethodSelect('nickname')}
           >
-            <View style={[styles.methodIcon, { backgroundColor: colors.accent + '20' }]}>
+            <View style={[styles.methodIcon, { backgroundColor: `${colors.accent}20` }]}>
               <Ionicons name="person" size={32} color={colors.accent} />
             </View>
             <View style={styles.methodInfo}>
               <Text style={styles.methodTitle}>Никнейм / Nickname</Text>
               <Text style={styles.methodDesc}>Никнейм и пароль</Text>
             </View>
-            <Ionicons name="chevron-forward" size={24} color={colors.textSecondary} />
+            <Ionicons
+              name="chevron-forward"
+              size={24}
+              color={colors.textSecondary}
+            />
           </TouchableOpacity>
         </View>
 
@@ -130,7 +139,7 @@ const styles = StyleSheet.create({
     fontSize: fonts.sizes.md,
     color: colors.secondary,
     marginTop: spacing.xs,
-    letterSpacing: 4,
+    letterSpacing: 2,
     textTransform: 'uppercase',
   },
   glowLine: {

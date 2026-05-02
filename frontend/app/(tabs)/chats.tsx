@@ -1,23 +1,23 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
-  View,
-  Text,
-  FlatList,
-  TouchableOpacity,
-  StyleSheet,
-  RefreshControl,
   ActivityIndicator,
+  FlatList,
+  RefreshControl,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useUserStore } from '../../stores/userStore';
 import { api } from '../../services/api';
 import { socketService } from '../../services/socket';
-import { colors, spacing, borderRadius, fonts } from '../../constants/theme';
+import { borderRadius, colors, fonts, spacing } from '../../constants/theme';
 
 export default function ChatsScreen() {
   const router = useRouter();
-  const { user } = useUserStore();
+  const { user, getAccessToken } = useUserStore();
   const [conversations, setConversations] = useState<any[]>([]);
   const [users, setUsers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -30,30 +30,15 @@ export default function ChatsScreen() {
     }
 
     loadData();
-    connectSocket();
+
+    const unsubscribe = socketService.onNewMessage(() => {
+      loadConversations();
+    });
 
     return () => {
-      socketService.disconnect();
+      unsubscribe();
     };
   }, [user]);
-
-  const connectSocket = () => {
-    if (user) {
-      socketService.connect(user.id);
-
-      socketService.onNewMessage((message: any) => {
-        loadConversations();
-      });
-
-      socketService.onUserStatus((data: any) => {
-        setUsers((prev) =>
-          prev.map((u) =>
-            u.id === data.user_id ? { ...u, is_online: data.is_online } : u
-          )
-        );
-      });
-    }
-  };
 
   const loadData = async () => {
     await Promise.all([loadConversations(), loadUsers()]);
@@ -62,8 +47,12 @@ export default function ChatsScreen() {
 
   const loadConversations = async () => {
     if (!user) return;
+
+    const token = getAccessToken();
+    if (!token) return;
+
     try {
-      const data = await api.getConversations(user.id);
+      const data = await api.getConversations(token, user.id);
       setConversations(data);
     } catch (error) {
       console.error('Error loading conversations:', error);
@@ -71,8 +60,11 @@ export default function ChatsScreen() {
   };
 
   const loadUsers = async () => {
+    const token = getAccessToken();
+    if (!token) return;
+
     try {
-      const data = await api.getUsers();
+      const data = await api.getUsers(token);
       setUsers(data.filter((u: any) => u.id !== user?.id));
     } catch (error) {
       console.error('Error loading users:', error);
@@ -90,7 +82,7 @@ export default function ChatsScreen() {
       pathname: '/chat/[id]',
       params: {
         id: conversation.id,
-        name: conversation.name || conversation.other_user?.nickname || 'チャット',
+        name: conversation.name || conversation.other_user?.nickname || 'Чат',
         type: conversation.type,
       },
     });
@@ -99,7 +91,9 @@ export default function ChatsScreen() {
   const handleUserPress = async (selectedUser: any) => {
     if (!user) return;
 
-    // Check if conversation already exists
+    const token = getAccessToken();
+    if (!token) return;
+
     const existing = conversations.find(
       (c) =>
         c.type === 'direct' &&
@@ -110,12 +104,12 @@ export default function ChatsScreen() {
     if (existing) {
       handleConversationPress(existing);
     } else {
-      // Create new conversation
       try {
-        const newConv = await api.createConversation({
+        const newConv = await api.createConversation(token, {
           type: 'direct',
           participants: [user.id, selectedUser.id],
         });
+
         router.push({
           pathname: '/chat/[id]',
           params: {
@@ -137,7 +131,7 @@ export default function ChatsScreen() {
     const diff = now.getTime() - date.getTime();
     const hours = Math.floor(diff / (1000 * 60 * 60));
 
-    if (hours < 1) return '今';
+    if (hours < 1) return 'now';
     if (hours < 24) return `${hours}h`;
     return `${Math.floor(hours / 24)}d`;
   };
@@ -146,7 +140,7 @@ export default function ChatsScreen() {
     const isGlobal = item.type === 'global';
     const displayName = isGlobal
       ? item.name
-      : item.other_user?.nickname || 'ユーザー';
+      : item.other_user?.nickname || 'Пользователь';
     const isOnline = isGlobal || item.other_user?.is_online;
 
     return (
@@ -192,10 +186,7 @@ export default function ChatsScreen() {
   };
 
   const renderUser = ({ item }: any) => (
-    <TouchableOpacity
-      style={styles.userItem}
-      onPress={() => handleUserPress(item)}
-    >
+    <TouchableOpacity style={styles.userItem} onPress={() => handleUserPress(item)}>
       <View style={styles.avatarContainer}>
         <View style={styles.avatarSmall}>
           <Ionicons name="person" size={20} color={colors.text} />
@@ -222,13 +213,13 @@ export default function ChatsScreen() {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>キリネット</Text>
+        <Text style={styles.headerTitle}>KiriNet</Text>
         <Text style={styles.headerSubtitle}>KiriNet Messenger</Text>
       </View>
 
       {users.length > 0 && (
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>オンラインユーザー / Online Users</Text>
+          <Text style={styles.sectionTitle}>Пользователи онлайн / Online Users</Text>
           <FlatList
             horizontal
             data={users}
@@ -241,7 +232,7 @@ export default function ChatsScreen() {
       )}
 
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>会話 / Conversations</Text>
+        <Text style={styles.sectionTitle}>Чаты / Conversations</Text>
         <FlatList
           data={conversations}
           renderItem={renderConversation}
@@ -260,7 +251,7 @@ export default function ChatsScreen() {
                 size={48}
                 color={colors.textSecondary}
               />
-              <Text style={styles.emptyText}>会話がありません</Text>
+              <Text style={styles.emptyText}>Чатов пока нет</Text>
               <Text style={styles.emptySubtext}>No conversations yet</Text>
             </View>
           }

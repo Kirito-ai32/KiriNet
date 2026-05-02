@@ -1,146 +1,193 @@
-import Constants from 'expo-constants';
+import { API_URL } from './backend';
 
-// @ts-ignore
-const BACKEND_URL = process.env.EXPO_PUBLIC_BACKEND_URL || Constants.expoConfig?.extra?.EXPO_PUBLIC_BACKEND_URL || 'http://localhost:8001';
-const API_URL = `${BACKEND_URL}/api`;
+const getAuthHeaders = (token?: string) => {
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+  };
 
-console.log('API Service initialized with URL:', API_URL);
+  if (token) {
+    headers.Authorization = `Bearer ${token}`;
+  }
 
-// Helper для получения токена
-const getAuthHeader = (token: string) => ({
-  'Authorization': `Bearer ${token}`,
-  'Content-Type': 'application/json',
-});
+  return headers;
+};
+
+const getErrorMessage = async (response: Response, fallback: string) => {
+  const text = await response.text();
+  return text || fallback;
+};
+
+export const register = async (data: any) => {
+  const response = await fetch(`${API_URL}/auth/register`, {
+    method: "POST",
+    headers: getAuthHeaders(),
+    body: JSON.stringify(data),
+  });
+
+  if (!response.ok) {
+    throw new Error(await getErrorMessage(response, "Registration failed"));
+  }
+
+  return await response.json();
+};
+
+export const login = async (data: any) => {
+  const response = await fetch(`${API_URL}/auth/login`, {
+    method: "POST",
+    headers: getAuthHeaders(),
+    body: JSON.stringify(data),
+  });
+
+  if (!response.ok) {
+    throw new Error(await getErrorMessage(response, "Login failed"));
+  }
+
+  return await response.json();
+};
+
+export const sendSMS = async (phone: string) => {
+  const query = new URLSearchParams({ phone: phone.trim() }).toString();
+  const response = await fetch(`${API_URL}/auth/send-sms?${query}`, {
+    method: "POST",
+    headers: getAuthHeaders(),
+  });
+
+  if (!response.ok) {
+    throw new Error(await getErrorMessage(response, "SMS failed"));
+  }
+
+  return await response.json();
+};
+
+export const logout = async (token: string) => {
+  const response = await fetch(`${API_URL}/auth/logout`, {
+    method: "POST",
+    headers: getAuthHeaders(token),
+  });
+
+  if (response.status === 401) {
+    return { success: true, message: "Session already expired" };
+  }
+
+  if (!response.ok) {
+    throw new Error(await getErrorMessage(response, "Logout failed"));
+  }
+
+  return await response.json();
+};
+
+export const getProfile = async (token: string) => {
+  const response = await fetch(`${API_URL}/auth/me`, {
+    method: "GET",
+    headers: getAuthHeaders(token),
+  });
+
+  if (!response.ok) {
+    throw new Error("Не удалось получить профиль");
+  }
+
+  return await response.json();
+};
+
+export const getUsers = async (token: string) => {
+  const response = await fetch(`${API_URL}/users`, {
+    method: "GET",
+    headers: getAuthHeaders(token),
+  });
+
+  if (!response.ok) {
+    throw new Error("Failed to get users");
+  }
+
+  return await response.json();
+};
+
+export const getConversations = async (token: string, userId: string) => {
+  const response = await fetch(
+    `${API_URL}/conversations?user_id=${encodeURIComponent(userId)}`,
+    {
+      method: "GET",
+      headers: getAuthHeaders(token),
+    }
+  );
+
+  if (!response.ok) {
+    throw new Error("Не удалось загрузить чаты");
+  }
+
+  return await response.json();
+};
+
+export const createConversation = async (
+  token: string,
+  data: {
+    type: string;
+    participants: string[];
+  }
+) => {
+  const response = await fetch(`${API_URL}/conversations`, {
+    method: "POST",
+    headers: getAuthHeaders(token),
+    body: JSON.stringify(data),
+  });
+
+  if (!response.ok) {
+    throw new Error(await getErrorMessage(response, "Не удалось создать чат"));
+  }
+
+  return await response.json();
+};
+
+export const getMessages = async (token: string, conversationId: string) => {
+  const response = await fetch(
+    `${API_URL}/messages/${encodeURIComponent(conversationId)}`,
+    {
+      method: "GET",
+      headers: getAuthHeaders(token),
+    }
+  );
+
+  if (!response.ok) {
+    throw new Error("Не удалось загрузить сообщения");
+  }
+
+  return await response.json();
+};
+
+export const createMessage = async (
+  token: string,
+  data: {
+    client_id: string;
+    conversation_id: string;
+    sender_id: string;
+    sender_nickname: string;
+    content: string;
+  }
+) => {
+  const response = await fetch(`${API_URL}/messages`, {
+    method: "POST",
+    headers: getAuthHeaders(token),
+    body: JSON.stringify(data),
+  });
+
+  if (!response.ok) {
+    throw new Error(
+      await getErrorMessage(response, "Не удалось отправить сообщение")
+    );
+  }
+
+  return await response.json();
+};
 
 export const api = {
-  // ===== AUTH API =====
-  async sendSMS(phone: string) {
-    const response = await fetch(`${API_URL}/auth/send-sms?phone=${encodeURIComponent(phone)}`, {
-      method: 'POST',
-    });
-    return response.json();
-  },
-
-  async register(data: {
-    auth_method: 'phone' | 'email' | 'nickname';
-    nickname: string;
-    phone?: string;
-    email?: string;
-    password?: string;
-    sms_code?: string;
-  }) {
-    const response = await fetch(`${API_URL}/auth/register`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data),
-    });
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.detail || 'Ошибка регистрации');
-    }
-    return response.json();
-  },
-
-  async login(data: {
-    auth_method: 'phone' | 'email' | 'nickname';
-    identifier: string;
-    password?: string;
-    sms_code?: string;
-  }) {
-    const response = await fetch(`${API_URL}/auth/login`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data),
-    });
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.detail || 'Ошибка входа');
-    }
-    return response.json();
-  },
-
-  async getProfile(token: string) {
-    const response = await fetch(`${API_URL}/auth/me`, {
-      headers: getAuthHeader(token),
-    });
-    if (!response.ok) {
-      throw new Error('Не удалось загрузить профиль');
-    }
-    return response.json();
-  },
-
-  async updateProfile(token: string, data: any) {
-    const response = await fetch(`${API_URL}/auth/me`, {
-      method: 'PUT',
-      headers: getAuthHeader(token),
-      body: JSON.stringify(data),
-    });
-    return response.json();
-  },
-
-  async logout(token: string) {
-    const response = await fetch(`${API_URL}/auth/logout`, {
-      method: 'POST',
-      headers: getAuthHeader(token),
-    });
-    return response.json();
-  },
-
-  async refreshToken(refreshToken: string) {
-    const response = await fetch(`${API_URL}/auth/refresh`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ refresh_token: refreshToken }),
-    });
-    return response.json();
-  },
-
-  // ===== LEGACY API (для обратной совместимости) =====
-  async createUser(nickname: string) {
-    const response = await fetch(`${API_URL}/users`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ nickname }),
-    });
-    return response.json();
-  },
-
-  async getUsers() {
-    const response = await fetch(`${API_URL}/users`);
-    return response.json();
-  },
-
-  async getUser(userId: string) {
-    const response = await fetch(`${API_URL}/users/${userId}`);
-    return response.json();
-  },
-
-  // ===== CHAT API =====
-  async getConversations(userId: string) {
-    const response = await fetch(`${API_URL}/conversations?user_id=${userId}`);
-    return response.json();
-  },
-
-  async createConversation(data: any) {
-    const response = await fetch(`${API_URL}/conversations`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data),
-    });
-    return response.json();
-  },
-
-  async getMessages(conversationId: string) {
-    const response = await fetch(`${API_URL}/messages/${conversationId}`);
-    return response.json();
-  },
-
-  async createMessage(data: any) {
-    const response = await fetch(`${API_URL}/messages`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data),
-    });
-    return response.json();
-  },
+  register,
+  login,
+  sendSMS,
+  logout,
+  getProfile,
+  getConversations,
+  getUsers,
+  createConversation,
+  getMessages,
+  createMessage,
 };

@@ -1,36 +1,174 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
-  View,
-  Text,
   FlatList,
-  TextInput,
-  TouchableOpacity,
-  StyleSheet,
+  Keyboard,
   KeyboardAvoidingView,
   Platform,
-  Keyboard,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { useUserStore } from '../../stores/userStore';
 import { api } from '../../services/api';
 import { socketService } from '../../services/socket';
-import { colors, spacing, borderRadius, fonts } from '../../constants/theme';
+import { useUserStore } from '../../stores/userStore';
+import { borderRadius, colors, fonts, spacing } from '../../constants/theme';
+
+type MessageStatus = 'sending' | 'sent' | 'failed';
+
+type ChatMessage = {
+  id: string;
+  client_id?: string;
+  conversation_id: string;
+  sender_id: string;
+  sender_nickname: string;
+  content: string;
+  timestamp: string;
+  status: MessageStatus;
+};
+
+const createClientId = (): string => {
+  if (
+    typeof globalThis.crypto !== 'undefined' &&
+    typeof globalThis.crypto.randomUUID === 'function'
+  ) {
+    return globalThis.crypto.randomUUID();
+  }
+
+  // UUID v4 fallback for runtimes without crypto.randomUUID
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (char) => {
+    const random = Math.floor(Math.random() * 16);
+    const value = char === 'x' ? random : (random & 0x3) | 0x8;
+    return value.toString(16);
+  });
+};
+
+const getMessageDate = (timestamp?: string): number => {
+  if (!timestamp) {
+    return 0;
+  }
+
+  const value = new Date(timestamp).getTime();
+  return Number.isFinite(value) ? value : 0;
+};
+
+const normalizeMessage = (raw: any): ChatMessage => ({
+  id:
+    typeof raw?.id === 'string' && raw.id.length > 0
+      ? raw.id
+      : `local-${raw?.client_id ?? createClientId()}`,
+  client_id: raw?.client_id,
+  conversation_id: raw?.conversation_id ?? '',
+  sender_id: raw?.sender_id ?? '',
+  sender_nickname: raw?.sender_nickname ?? '',
+  content: raw?.content ?? '',
+  timestamp:
+    typeof raw?.timestamp === 'string' && raw.timestamp.length > 0
+      ? raw.timestamp
+      : new Date().toISOString(),
+  status:
+    raw?.status === 'sending' || raw?.status === 'failed' ? raw.status : 'sent',
+});
 
 export default function ChatScreen() {
   const router = useRouter();
   const params = useLocalSearchParams();
-  const { user } = useUserStore();
-  const [messages, setMessages] = useState<any[]>([]);
-  const [inputText, setInputText] = useState('');
-  const [isTyping, setIsTyping] = useState(false);
-  const [typingUser, setTypingUser] = useState('');
-  const flatListRef = useRef<FlatList>(null);
-  const typingTimeoutRef = useRef<NodeJS.Timeout>();
+  const { user, getAccessToken } = useUserStore();
 
-  const conversationId = params.id as string;
-  const conversationName = params.name as string;
-  const conversationType = params.type as string;
+  const conversationId = (params.id as string) || '';
+  const conversationName = (params.name as string) || 'Chat';
+  const conversationType = (params.type as string) || 'direct';
+
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [inputText, setInputText] = useState('');
+  const [socketConnected, setSocketConnected] = useState(socketService.isConnected());
+
+  const flatListRef = useRef<FlatList>(null);
+
+  const scrollToBottom = (animated: boolean) => {
+    setTimeout(() => {
+      flatListRef.current?.scrollToEnd({ animated });
+    }, 100);
+  };
+
+  const upsertMessage = (rawMessage: any) => {
+    const nextMessage = normalizeMessage(rawMessage);
+
+    setMessages((prev) => {
+      const existingIndex = prev.findIndex(
+        (item) =>
+          (nextMessage.client_id &&
+            item.client_id &&
+            item.client_id === nextMessage.client_id) ||
+          item.id === nextMessage.id
+      );
+
+      if (existingIndex === -1) {
+        return [...prev, nextMessage].sort(
+          (a, b) => getMessageDate(a.timestamp) - getMessageDate(b.timestamp)
+        );
+      }
+
+      const merged = {
+        ...prev[existingIndex],
+        ...nextMessage,
+      };
+
+      const updated = [...prev];
+      updated[existingIndex] = merged;
+
+      return updated.sort(
+        (a, b) => getMessageDate(a.timestamp) - getMessageDate(b.timestamp)
+      );
+    });
+  };
+
+  const setMessageStatus = (clientId: string, status: MessageStatus) => {
+    setMessages((prev) =>
+      prev.map((message) =>
+        message.client_id === clientId ? { ...message, status } : message
+      )
+    );
+  };
+
+  const loadMessages = async () => {
+    if (!user || !conversationId) return;
+
+    const token = getAccessToken();
+    if (!token) return;
+
+    try {
+      const raw = await api.getMessages(token, conversationId);
+      const serverMessages: ChatMessage[] = raw.map((message: any) =>
+        normalizeMessage({ ...message, status: 'sent' })
+      );
+
+      setMessages((prev) => {
+        const localPending = prev.filter(
+          (item) =>
+            item.status !== 'sent' &&
+            !serverMessages.some(
+              (serverItem: ChatMessage) =>
+                (item.client_id &&
+                  serverItem.client_id &&
+                  item.client_id === serverItem.client_id) ||
+                item.id === serverItem.id
+            )
+        );
+
+        return [...serverMessages, ...localPending].sort(
+          (a, b) => getMessageDate(a.timestamp) - getMessageDate(b.timestamp)
+        );
+      });
+
+      scrollToBottom(false);
+    } catch (error) {
+      console.error('Error loading messages:', error);
+    }
+  };
 
   useEffect(() => {
     if (!user) {
@@ -38,115 +176,98 @@ export default function ChatScreen() {
       return;
     }
 
+    socketService.connect(user.id);
     loadMessages();
-    setupSocketListeners();
+
+    const unsubscribeMessages = socketService.onNewMessage((message: any) => {
+      if (message.conversation_id !== conversationId) {
+        return;
+      }
+
+      upsertMessage({ ...message, status: 'sent' });
+      scrollToBottom(true);
+    });
+
+    const unsubscribeConnection = socketService.onConnectionChange(
+      (connected: boolean) => {
+        setSocketConnected(connected);
+      }
+    );
 
     return () => {
-      cleanup();
+      unsubscribeMessages();
+      unsubscribeConnection();
     };
-  }, [conversationId]);
+  }, [conversationId, user]);
 
-  const setupSocketListeners = () => {
-    socketService.onNewMessage(handleNewMessage);
-    socketService.onUserTyping(handleUserTyping);
-  };
-
-  const cleanup = () => {
-    socketService.removeListener('new_message', handleNewMessage);
-    socketService.removeListener('user_typing', handleUserTyping);
-  };
-
-  const handleNewMessage = (message: any) => {
-    if (message.conversation_id === conversationId) {
-      setMessages((prev) => [...prev, message]);
-      setTimeout(() => {
-        flatListRef.current?.scrollToEnd({ animated: true });
-      }, 100);
+  const sendMessageWithClientId = async (message: ChatMessage) => {
+    if (!user) {
+      throw new Error('User not found');
     }
-  };
 
-  const handleUserTyping = (data: any) => {
-    if (data.conversation_id === conversationId && data.user_id !== user?.id) {
-      setTypingUser(data.nickname);
-      setIsTyping(true);
-      
-      if (typingTimeoutRef.current) {
-        clearTimeout(typingTimeoutRef.current);
-      }
-      
-      typingTimeoutRef.current = setTimeout(() => {
-        setIsTyping(false);
-        setTypingUser('');
-      }, 3000);
+    const token = getAccessToken();
+    if (!token) {
+      throw new Error('Missing access token');
     }
-  };
 
-  const loadMessages = async () => {
-    try {
-      const data = await api.getMessages(conversationId);
-      setMessages(data);
-      setTimeout(() => {
-        flatListRef.current?.scrollToEnd({ animated: false });
-      }, 100);
-    } catch (error) {
-      console.error('Error loading messages:', error);
-    }
+    const saved = await api.createMessage(token, {
+      client_id: message.client_id || createClientId(),
+      conversation_id: message.conversation_id,
+      sender_id: message.sender_id,
+      sender_nickname: message.sender_nickname,
+      content: message.content,
+    });
+
+    upsertMessage({ ...saved, status: 'sent' });
   };
 
   const handleSendMessage = async () => {
-    if (!inputText.trim() || !user) {
-      console.log('Cannot send: empty message or no user');
-      return;
-    }
+    if (!user || !conversationId || !inputText.trim()) return;
 
-    const messageData = {
+    const content = inputText.trim();
+    const clientId = createClientId();
+    const optimisticMessage: ChatMessage = {
+      id: `local-${clientId}`,
+      client_id: clientId,
       conversation_id: conversationId,
       sender_id: user.id,
       sender_nickname: user.nickname,
-      content: inputText.trim(),
+      content,
+      timestamp: new Date().toISOString(),
+      status: 'sending',
     };
 
-    console.log('Sending message:', messageData);
-    
-    // Очищаем поле ввода сразу для лучшего UX
-    const messageCopy = inputText.trim();
     setInputText('');
     Keyboard.dismiss();
+    upsertMessage(optimisticMessage);
+    scrollToBottom(true);
 
     try {
-      // Отправляем через REST API (надежнее чем WebSocket в данной среде)
-      const newMessage = await api.createMessage(messageData);
-      console.log('Message sent successfully:', newMessage);
-      
-      // Добавляем сообщение в список локально
-      setMessages((prev) => [...prev, newMessage]);
-      
-      // Также пытаемся отправить через WebSocket для real-time если подключен
-      if (socketService.isConnected()) {
-        socketService.sendMessage(messageData);
-      }
-      
-      // Прокручиваем вниз
-      setTimeout(() => {
-        flatListRef.current?.scrollToEnd({ animated: true });
-      }, 100);
+      await sendMessageWithClientId(optimisticMessage);
     } catch (error) {
       console.error('Error sending message:', error);
-      // Восстанавливаем текст при ошибке
-      setInputText(messageCopy);
-      alert('Ошибка отправки сообщения. Попробуйте снова.');
+      setMessageStatus(clientId, 'failed');
+      const message =
+        error instanceof Error ? error.message : 'Failed to send message';
+      alert(message);
     }
   };
 
-  const handleTyping = (text: string) => {
-    setInputText(text);
-    
-    if (text.trim() && user) {
-      socketService.sendTyping({
-        conversation_id: conversationId,
-        user_id: user.id,
-        nickname: user.nickname,
-      });
+  const handleRetryMessage = async (message: ChatMessage) => {
+    if (!message.client_id) {
+      return;
+    }
+
+    setMessageStatus(message.client_id, 'sending');
+
+    try {
+      await sendMessageWithClientId(message);
+    } catch (error) {
+      console.error('Retry failed:', error);
+      setMessageStatus(message.client_id, 'failed');
+      const messageText =
+        error instanceof Error ? error.message : 'Retry failed';
+      alert(messageText);
     }
   };
 
@@ -158,7 +279,27 @@ export default function ChatScreen() {
     });
   };
 
-  const renderMessage = ({ item }: any) => {
+  const renderOwnStatus = (item: ChatMessage) => {
+    if (item.status === 'sent') {
+      return null;
+    }
+
+    if (item.status === 'sending') {
+      return <Text style={styles.statusSending}>sending</Text>;
+    }
+
+    return (
+      <TouchableOpacity
+        style={styles.retryButton}
+        onPress={() => handleRetryMessage(item)}
+      >
+        <Ionicons name="refresh" size={12} color={colors.error} />
+        <Text style={styles.statusFailed}>retry</Text>
+      </TouchableOpacity>
+    );
+  };
+
+  const renderMessage = ({ item }: { item: ChatMessage }) => {
     const isOwnMessage = item.sender_id === user?.id;
 
     return (
@@ -186,7 +327,10 @@ export default function ChatScreen() {
             {item.content}
           </Text>
         </View>
-        <Text style={styles.messageTime}>{formatTime(item.timestamp)}</Text>
+        <View style={styles.messageMeta}>
+          <Text style={styles.messageTime}>{formatTime(item.timestamp)}</Text>
+          {isOwnMessage && renderOwnStatus(item)}
+        </View>
       </View>
     );
   };
@@ -195,57 +339,47 @@ export default function ChatScreen() {
     <KeyboardAvoidingView
       style={styles.container}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
+      keyboardVerticalOffset={0}
     >
       <View style={styles.header}>
-        <TouchableOpacity
-          style={styles.backButton}
-          onPress={() => router.back()}
-        >
+        <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
           <Ionicons name="arrow-back" size={24} color={colors.text} />
         </TouchableOpacity>
         <View style={styles.headerContent}>
           <Text style={styles.headerTitle}>{conversationName}</Text>
           {conversationType === 'global' && (
-            <Text style={styles.headerSubtitle}>グローバルチャット</Text>
+            <Text style={styles.headerSubtitle}>Global chat</Text>
           )}
         </View>
       </View>
+
+      {!socketConnected && (
+        <View style={styles.connectionBanner}>
+          <Text style={styles.connectionBannerText}>Reconnecting...</Text>
+        </View>
+      )}
 
       <FlatList
         ref={flatListRef}
         data={messages}
         renderItem={renderMessage}
-        keyExtractor={(item) => item.id}
+        keyExtractor={(item) => item.client_id || item.id}
         contentContainerStyle={styles.messagesList}
-        onContentSizeChange={() =>
-          flatListRef.current?.scrollToEnd({ animated: true })
-        }
+        onContentSizeChange={() => scrollToBottom(true)}
       />
-
-      {isTyping && (
-        <View style={styles.typingContainer}>
-          <Text style={styles.typingText}>
-            {typingUser} が入力中...
-          </Text>
-        </View>
-      )}
 
       <View style={styles.inputContainer}>
         <TextInput
           style={styles.input}
-          placeholder="メッセージ... / Message..."
+          placeholder="Message..."
           placeholderTextColor={colors.textSecondary}
           value={inputText}
-          onChangeText={handleTyping}
+          onChangeText={setInputText}
           multiline
           maxLength={1000}
         />
         <TouchableOpacity
-          style={[
-            styles.sendButton,
-            !inputText.trim() && styles.sendButtonDisabled,
-          ]}
+          style={[styles.sendButton, !inputText.trim() && styles.sendButtonDisabled]}
           onPress={handleSendMessage}
           disabled={!inputText.trim()}
         >
@@ -291,6 +425,16 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
     marginTop: 2,
   },
+  connectionBanner: {
+    paddingVertical: spacing.xs,
+    paddingHorizontal: spacing.md,
+    backgroundColor: colors.warning,
+  },
+  connectionBannerText: {
+    color: colors.background,
+    fontSize: fonts.sizes.xs,
+    fontWeight: '600',
+  },
   messagesList: {
     padding: spacing.md,
   },
@@ -335,20 +479,29 @@ const styles = StyleSheet.create({
   otherMessageText: {
     color: colors.text,
   },
+  messageMeta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: spacing.xs,
+    marginHorizontal: spacing.sm,
+    gap: spacing.xs,
+  },
   messageTime: {
     fontSize: fonts.sizes.xs,
     color: colors.textSecondary,
-    marginTop: spacing.xs,
-    marginHorizontal: spacing.sm,
   },
-  typingContainer: {
-    padding: spacing.sm,
-    paddingHorizontal: spacing.md,
-  },
-  typingText: {
+  statusSending: {
     fontSize: fonts.sizes.xs,
-    color: colors.secondary,
-    fontStyle: 'italic',
+    color: colors.warning,
+  },
+  statusFailed: {
+    fontSize: fonts.sizes.xs,
+    color: colors.error,
+  },
+  retryButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
   },
   inputContainer: {
     flexDirection: 'row',

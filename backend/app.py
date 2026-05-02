@@ -1,6 +1,2 @@
-"""
-ASGI Application entry point for Socket.IO
-"""
-from server import socket_app
-
-app = socket_app
+"""ASGI application entry point."""
+from server import app

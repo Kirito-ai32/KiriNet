@@ -26,7 +26,7 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="chats"
         options={{
-          title: 'チャット',
+          title: 'Чаты',
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="chatbubbles" size={size} color={color} />
           ),
@@ -35,7 +35,7 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="settings"
         options={{
-          title: '設定',
+          title: 'Настройки',
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="settings" size={size} color={color} />
           ),

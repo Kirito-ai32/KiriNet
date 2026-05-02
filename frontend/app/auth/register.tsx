@@ -1,29 +1,29 @@
 import React, { useState } from 'react';
 import {
-  View,
+  ActivityIndicator,
+  Alert,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+  StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
-  StyleSheet,
-  KeyboardAvoidingView,
-  Platform,
-  ActivityIndicator,
-  ScrollView,
-  Alert,
+  View,
 } from 'react-native';
-import { useRouter, useLocalSearchParams } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useUserStore } from '../../stores/userStore';
-import { api } from '../../services/api';
-import { colors, spacing, borderRadius, fonts } from '../../constants/theme';
+import * as api from '../../services/api';
+import { borderRadius, colors, fonts, spacing } from '../../constants/theme';
 
 export default function RegisterScreen() {
   const router = useRouter();
   const params = useLocalSearchParams();
   const { setUserAndTokens } = useUserStore();
-  
+
   const method = (params.method as 'phone' | 'email' | 'nickname') || 'nickname';
-  
+
   const [nickname, setNickname] = useState('');
   const [phone, setPhone] = useState('');
   const [email, setEmail] = useState('');
@@ -46,7 +46,7 @@ export default function RegisterScreen() {
       setSmsCodeSent(true);
       setGeneratedCode(response.code_for_testing);
       Alert.alert(
-        '📱 SMS код отправлен',
+        'SMS-код отправлен',
         `Для теста: код ${response.code_for_testing}\n\nВведите его в поле ниже`,
         [{ text: 'OK' }]
       );
@@ -58,7 +58,6 @@ export default function RegisterScreen() {
   };
 
   const handleRegister = async () => {
-    // Валидация
     if (!nickname.trim()) {
       Alert.alert('Ошибка', 'Введите никнейм');
       return;
@@ -70,7 +69,7 @@ export default function RegisterScreen() {
         return;
       }
       if (!smsCode.trim()) {
-        Alert.alert('Ошибка', 'Введите SMS код');
+        Alert.alert('Ошибка', 'Введите SMS-код');
         return;
       }
     }
@@ -122,19 +121,13 @@ export default function RegisterScreen() {
       } else if (method === 'email') {
         registerData.email = email.trim();
         registerData.password = password;
-      } else if (method === 'nickname') {
+      } else {
         registerData.password = password;
       }
 
       const tokens = await api.register(registerData);
-      
-      // Получаем профиль пользователя
       const userProfile = await api.getProfile(tokens.access_token);
-      
-      // Сохраняем пользователя и токены
       await setUserAndTokens(userProfile, tokens);
-      
-      // Переходим в чаты
       router.replace('/(tabs)/chats');
     } catch (error: any) {
       console.error('Registration error:', error);
@@ -152,6 +145,8 @@ export default function RegisterScreen() {
         return 'mail';
       case 'nickname':
         return 'person';
+      default:
+        return 'person';
     }
   };
 
@@ -163,6 +158,8 @@ export default function RegisterScreen() {
         return 'Регистрация по email';
       case 'nickname':
         return 'Регистрация по никнейму';
+      default:
+        return 'Регистрация';
     }
   };
 
@@ -175,22 +172,18 @@ export default function RegisterScreen() {
         contentContainerStyle={styles.scrollContent}
         keyboardShouldPersistTaps="handled"
       >
-        <TouchableOpacity
-          style={styles.backButton}
-          onPress={() => router.back()}
-        >
+        <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
           <Ionicons name="arrow-back" size={24} color={colors.text} />
         </TouchableOpacity>
 
         <View style={styles.header}>
-          <View style={[styles.iconContainer, { backgroundColor: colors.primary + '20' }]}>
-            <Ionicons name={getMethodIcon()} size={40} color={colors.primary} />
+          <View style={[styles.iconContainer, { backgroundColor: `${colors.primary}20` }]}>
+            <Ionicons name={getMethodIcon() as any} size={40} color={colors.primary} />
           </View>
           <Text style={styles.title}>{getMethodTitle()}</Text>
         </View>
 
         <View style={styles.form}>
-          {/* Никнейм - для всех методов */}
           <View style={styles.inputGroup}>
             <Text style={styles.label}>Никнейм / Nickname</Text>
             <View style={styles.inputContainer}>
@@ -207,7 +200,6 @@ export default function RegisterScreen() {
             </View>
           </View>
 
-          {/* Телефон + SMS */}
           {method === 'phone' && (
             <>
               <View style={styles.inputGroup}>
@@ -226,23 +218,18 @@ export default function RegisterScreen() {
                     />
                   </View>
                   <TouchableOpacity
-                    style={[
-                      styles.smsButton,
-                      smsCodeSent && styles.smsButtonSent,
-                    ]}
+                    style={[styles.smsButton, smsCodeSent && styles.smsButtonSent]}
                     onPress={handleSendSMS}
                     disabled={loading || smsCodeSent}
                   >
-                    <Text style={styles.smsButtonText}>
-                      {smsCodeSent ? '✓' : 'SMS'}
-                    </Text>
+                    <Text style={styles.smsButtonText}>{smsCodeSent ? '✓' : 'SMS'}</Text>
                   </TouchableOpacity>
                 </View>
               </View>
 
               {smsCodeSent && (
                 <View style={styles.inputGroup}>
-                  <Text style={styles.label}>SMS Код</Text>
+                  <Text style={styles.label}>SMS-код</Text>
                   <View style={styles.inputContainer}>
                     <Ionicons name="keypad-outline" size={20} color={colors.textSecondary} />
                     <TextInput
@@ -263,7 +250,6 @@ export default function RegisterScreen() {
             </>
           )}
 
-          {/* Email + Пароль */}
           {method === 'email' && (
             <>
               <View style={styles.inputGroup}>
@@ -314,7 +300,6 @@ export default function RegisterScreen() {
             </>
           )}
 
-          {/* Только пароль для nickname */}
           {method === 'nickname' && (
             <>
               <View style={styles.inputGroup}>

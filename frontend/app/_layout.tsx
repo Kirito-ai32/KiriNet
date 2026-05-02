@@ -4,6 +4,7 @@ import { StatusBar } from 'expo-status-bar';
 import { View, ActivityIndicator } from 'react-native';
 import { useUserStore } from '../stores/userStore';
 import { colors } from '../constants/theme';
+import { socketService } from '../services/socket';
 
 export default function RootLayout() {
   const loadUser = useUserStore((state) => state.loadUser);
@@ -40,6 +41,23 @@ export default function RootLayout() {
       }
     }, 100);
   }, [user, isReady]);
+
+  useEffect(() => {
+    if (!isReady) return;
+
+    if (!user) {
+      socketService.disconnect();
+      return;
+    }
+
+    socketService.connect(user.id);
+
+    return () => {
+      if (!useUserStore.getState().user) {
+        socketService.disconnect();
+      }
+    };
+  }, [isReady, user]);
 
   if (!isReady) {
     return (

@@ -1,28 +1,28 @@
 import React, { useState } from 'react';
 import {
-  View,
+  ActivityIndicator,
+  Alert,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+  StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
-  StyleSheet,
-  KeyboardAvoidingView,
-  Platform,
-  ActivityIndicator,
-  ScrollView,
-  Alert,
+  View,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useUserStore } from '../../stores/userStore';
 import { api } from '../../services/api';
-import { colors, spacing, borderRadius, fonts } from '../../constants/theme';
+import { borderRadius, colors, fonts, spacing } from '../../constants/theme';
 
 type LoginMethod = 'phone' | 'email' | 'nickname';
 
 export default function LoginScreen() {
   const router = useRouter();
   const { setUserAndTokens } = useUserStore();
-  
+
   const [method, setMethod] = useState<LoginMethod>('nickname');
   const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
@@ -43,7 +43,7 @@ export default function LoginScreen() {
       setSmsCodeSent(true);
       setGeneratedCode(response.code_for_testing);
       Alert.alert(
-        '📱 SMS код отправлен',
+        'SMS-код отправлен',
         `Для теста: код ${response.code_for_testing}\n\nВведите его в поле ниже`,
         [{ text: 'OK' }]
       );
@@ -61,7 +61,7 @@ export default function LoginScreen() {
     }
 
     if (method === 'phone' && !smsCode.trim()) {
-      Alert.alert('Ошибка', 'Введите SMS код');
+      Alert.alert('Ошибка', 'Введите SMS-код');
       return;
     }
 
@@ -84,14 +84,8 @@ export default function LoginScreen() {
       }
 
       const tokens = await api.login(loginData);
-      
-      // Получаем профиль пользователя
       const userProfile = await api.getProfile(tokens.access_token);
-      
-      // Сохраняем пользователя и токены
       await setUserAndTokens(userProfile, tokens);
-      
-      // Переходим в чаты
       router.replace('/(tabs)/chats');
     } catch (error: any) {
       console.error('Login error:', error);
@@ -109,6 +103,8 @@ export default function LoginScreen() {
         return 'example@email.com';
       case 'nickname':
         return 'Ваш никнейм';
+      default:
+        return '';
     }
   };
 
@@ -119,6 +115,8 @@ export default function LoginScreen() {
       case 'email':
         return 'mail-outline';
       case 'nickname':
+        return 'person-outline';
+      default:
         return 'person-outline';
     }
   };
@@ -132,28 +130,21 @@ export default function LoginScreen() {
         contentContainerStyle={styles.scrollContent}
         keyboardShouldPersistTaps="handled"
       >
-        <TouchableOpacity
-          style={styles.backButton}
-          onPress={() => router.back()}
-        >
+        <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
           <Ionicons name="arrow-back" size={24} color={colors.text} />
         </TouchableOpacity>
 
         <View style={styles.header}>
-          <Text style={styles.logo}>キリネット</Text>
-          <Text style={styles.logoSub}>KiriNet</Text>
+          <Text style={styles.logo}>KiriNet</Text>
+          <Text style={styles.logoSub}>Messenger</Text>
           <View style={styles.glowLine} />
         </View>
 
         <Text style={styles.title}>Вход / Login</Text>
 
-        {/* Выбор метода */}
         <View style={styles.methodSelector}>
           <TouchableOpacity
-            style={[
-              styles.methodTab,
-              method === 'phone' && styles.methodTabActive,
-            ]}
+            style={[styles.methodTab, method === 'phone' && styles.methodTabActive]}
             onPress={() => {
               setMethod('phone');
               setIdentifier('');
@@ -178,10 +169,7 @@ export default function LoginScreen() {
           </TouchableOpacity>
 
           <TouchableOpacity
-            style={[
-              styles.methodTab,
-              method === 'email' && styles.methodTabActive,
-            ]}
+            style={[styles.methodTab, method === 'email' && styles.methodTabActive]}
             onPress={() => {
               setMethod('email');
               setIdentifier('');
@@ -206,10 +194,7 @@ export default function LoginScreen() {
           </TouchableOpacity>
 
           <TouchableOpacity
-            style={[
-              styles.methodTab,
-              method === 'nickname' && styles.methodTabActive,
-            ]}
+            style={[styles.methodTab, method === 'nickname' && styles.methodTabActive]}
             onPress={() => {
               setMethod('nickname');
               setIdentifier('');
@@ -235,7 +220,6 @@ export default function LoginScreen() {
         </View>
 
         <View style={styles.form}>
-          {/* Поле ввода (телефон/email/никнейм) */}
           <View style={styles.inputGroup}>
             <Text style={styles.label}>
               {method === 'phone' && 'Телефон / Phone'}
@@ -244,39 +228,39 @@ export default function LoginScreen() {
             </Text>
             <View style={styles.inputRow}>
               <View style={[styles.inputContainer, { flex: 1 }]}>
-                <Ionicons name={getInputIcon()} size={20} color={colors.textSecondary} />
+                <Ionicons name={getInputIcon() as any} size={20} color={colors.textSecondary} />
                 <TextInput
                   style={styles.input}
                   placeholder={getPlaceholder()}
                   placeholderTextColor={colors.textSecondary}
                   value={identifier}
                   onChangeText={setIdentifier}
-                  keyboardType={method === 'phone' ? 'phone-pad' : method === 'email' ? 'email-address' : 'default'}
+                  keyboardType={
+                    method === 'phone'
+                      ? 'phone-pad'
+                      : method === 'email'
+                      ? 'email-address'
+                      : 'default'
+                  }
                   autoCapitalize="none"
                   editable={!smsCodeSent || method !== 'phone'}
                 />
               </View>
               {method === 'phone' && (
                 <TouchableOpacity
-                  style={[
-                    styles.smsButton,
-                    smsCodeSent && styles.smsButtonSent,
-                  ]}
+                  style={[styles.smsButton, smsCodeSent && styles.smsButtonSent]}
                   onPress={handleSendSMS}
                   disabled={loading || smsCodeSent}
                 >
-                  <Text style={styles.smsButtonText}>
-                    {smsCodeSent ? '✓' : 'SMS'}
-                  </Text>
+                  <Text style={styles.smsButtonText}>{smsCodeSent ? '✓' : 'SMS'}</Text>
                 </TouchableOpacity>
               )}
             </View>
           </View>
 
-          {/* SMS код */}
           {method === 'phone' && smsCodeSent && (
             <View style={styles.inputGroup}>
-              <Text style={styles.label}>SMS Код</Text>
+              <Text style={styles.label}>SMS-код</Text>
               <View style={styles.inputContainer}>
                 <Ionicons name="keypad-outline" size={20} color={colors.textSecondary} />
                 <TextInput
@@ -295,7 +279,6 @@ export default function LoginScreen() {
             </View>
           )}
 
-          {/* Пароль */}
           {(method === 'email' || method === 'nickname') && (
             <View style={styles.inputGroup}>
               <Text style={styles.label}>Пароль / Password</Text>
@@ -366,7 +349,7 @@ const styles = StyleSheet.create({
     fontSize: fonts.sizes.md,
     color: colors.secondary,
     marginTop: spacing.xs,
-    letterSpacing: 4,
+    letterSpacing: 2,
     textTransform: 'uppercase',
   },
   glowLine: {
